@@ -1,7 +1,7 @@
 import api
 from game_layer import GameLayer
 
-api_key = "your-api-key-here"   # TODO: Your api key here
+api_key = ""   # TODO: Your api key here
 # The different map names can be found on considition.com/rules
 map_name = "training1"  # TODO: You map choice here. If left empty, the map "training1" will be selected.
 
@@ -61,6 +61,4 @@ def take_turn():
 
 
 if __name__ == "__main__":
-    api.end_game(api_key)
-    game_layer = GameLayer(api_key)
     main()
