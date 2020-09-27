@@ -38,8 +38,17 @@ def main():
 def take_turn():
     state = game_layer.game_state
 
-    # TODO: Make decisions #
-    build_residences(state)
+    # Take one of the following actions in order of priority #
+    if residence_maintenance(state):
+        pass
+    elif regulate_temperature(state):
+        pass
+    elif build_residence(state):
+        pass
+    elif place_residence(state):
+        pass
+    else:
+        game_layer.wait()
     # --- #
 
     for message in game_layer.game_state.messages:
@@ -48,8 +57,52 @@ def take_turn():
         print("Error: " + error)
 
 
-def build_residences(state):
-    pass
+# Maintain a residence in need of maintenance
+def residence_maintenance(state):
+    for residence in state.residences:
+        if residence.health < 50:
+            game_layer.maintenance((residence.X, residence.Y))
+            return True
+
+
+# Regulate the temperature of a residence if it's too low/high
+def regulate_temperature(state):
+    for residence in state.residences:
+        if residence.temperature < 18 or residence.temperature > 24:
+            blueprint = game_layer.get_residence_blueprint(residence.building_name)
+            energy = (
+                blueprint.base_energy_need
+                + (21 - residence.temperature)
+                + (residence.temperature - state.current_temp)
+                * blueprint.emissivity
+                / 1
+                - residence.current_pop * 0.04
+            )
+            game_layer.adjust_energy_level((residence.X, residence.Y), energy)
+            return True
+
+
+# Build a residence that is under construction
+def build_residence(state):
+    for residence in state.residences:
+        if residence.build_progress < 100:
+            game_layer.build((residence.X, residence.Y))
+            return True
+
+
+# Place a new (cheapest) residence at an available spot
+def place_residence(state):
+    cheapest_residence = min(state.available_residence_buildings, key=lambda x: x.cost)
+    if state.housing_queue >= cheapest_residence.max_pop:
+        for i in range(len(state.map)):
+            for j in range(len(state.map)):
+                if state.map[i][j] == 0:
+                    x = i
+                    y = j
+                    break
+        state.map[x][y] = 1
+        game_layer.place_foundation((x, y), cheapest_residence.building_name)
+        return True
 
 
 if __name__ == "__main__":
