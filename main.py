@@ -1,14 +1,20 @@
+import os
+import sys
+from pathlib import Path  # Python 3.6+ only
+
+from dotenv import load_dotenv
+
 import api
 from game_layer import GameLayer
-import sys
 
-api_key = "af79a1fd-d071-4109-8776-a31b815057ad"
+load_dotenv()
+API_KEY = os.getenv('API_KEY')
 # The different map names can be found on considition.com/rules
 # Map name taken as command line argument. 
 # If left empty, the map "training1" will be selected.
 map_name = sys.argv[1] if len(sys.argv) > 1 else "training1"
 
-game_layer: GameLayer = GameLayer(api_key)
+game_layer: GameLayer = GameLayer(API_KEY)
 
 
 def main():
@@ -21,8 +27,11 @@ def main():
             take_turn()
         print("Done with game: " + game_layer.game_state.game_id)
         print("Final score was: " + str(game_layer.get_score()["finalScore"]))
-    except: # End game session in case of exceptions
-        print("\nEnding game: ", game_layer.game_state.game_id)
+    except KeyboardInterrupt: # End game session in case of exceptions
+        print(f"\nForce quit game: {game_layer.game_state.game_id}")
+        game_layer.end_game()
+    except Exception as e: # Catching generic exceptions
+        print(f"Error: {e}")
         game_layer.end_game()
 
 
