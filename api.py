@@ -10,7 +10,9 @@ def new_game(api_key, game_options=""):
         global sess
         if not sess:
             sess = requests.Session()
-        response = sess.post(base_api_path + "new", json=game_options, headers={"x-api-key": api_key})
+        response = sess.post(
+            base_api_path + "new", json=game_options, headers={"x-api-key": api_key}
+        )
         if response.status_code == 200:
             return response.json()
 
@@ -30,7 +32,9 @@ def start_game(api_key, game_id=None):
         global sess
         if not sess:
             sess = requests.Session()
-        response = sess.get(base_api_path + "start" + game_id, headers={"x-api-key": api_key})
+        response = sess.get(
+            base_api_path + "start" + game_id, headers={"x-api-key": api_key}
+        )
         if response.status_code == 200:
             return response.json()
 
@@ -50,7 +54,9 @@ def end_game(api_key, game_id=None):
         global sess
         if not sess:
             sess = requests.Session()
-        response = sess.get(base_api_path + "end" + game_id, headers={"x-api-key": api_key})
+        response = sess.get(
+            base_api_path + "end" + game_id, headers={"x-api-key": api_key}
+        )
         if response.status_code == 200:
             return
 
@@ -70,7 +76,9 @@ def get_score(api_key, game_id=None):
         global sess
         if not sess:
             sess = requests.Session()
-        response = sess.get(base_api_path + "score" + game_id, headers={"x-api-key": api_key})
+        response = sess.get(
+            base_api_path + "score" + game_id, headers={"x-api-key": api_key}
+        )
         if response.status_code == 200:
             return response.json()
 
@@ -90,7 +98,9 @@ def get_game_info(api_key, game_id=None):
         global sess
         if not sess:
             sess = requests.Session()
-        response = sess.get(base_api_path + "gameInfo" + game_id, headers={"x-api-key": api_key})
+        response = sess.get(
+            base_api_path + "gameInfo" + game_id, headers={"x-api-key": api_key}
+        )
         if response.status_code == 200:
             return response.json()
 
@@ -98,7 +108,7 @@ def get_game_info(api_key, game_id=None):
         print(str(response.status_code) + " " + response.reason + ": " + response.text)
     except RequestException as e:
         print("Fatal Error: could not get game info")
-        print("Something went wrong with the request: " + str(e))        
+        print("Something went wrong with the request: " + str(e))
 
 
 def place_foundation(api_key, foundation, game_id=None):
@@ -110,7 +120,11 @@ def place_foundation(api_key, foundation, game_id=None):
         global sess
         if not sess:
             sess = requests.Session()
-        response = sess.post(base_api_path + "action/startBuild" + game_id, json=foundation, headers={"x-api-key": api_key})
+        response = sess.post(
+            base_api_path + "action/startBuild" + game_id,
+            json=foundation,
+            headers={"x-api-key": api_key},
+        )
         if response.status_code == 200:
             return response.json()
 
@@ -130,7 +144,11 @@ def build(api_key, pos, game_id=None):
         global sess
         if not sess:
             sess = requests.Session()
-        response = sess.post(base_api_path + "action/Build" + game_id, json=pos, headers={"x-api-key": api_key})
+        response = sess.post(
+            base_api_path + "action/Build" + game_id,
+            json=pos,
+            headers={"x-api-key": api_key},
+        )
         if response.status_code == 200:
             return response.json()
 
@@ -150,7 +168,11 @@ def maintenance(api_key, pos, game_id=None):
         global sess
         if not sess:
             sess = requests.Session()
-        response = sess.post(base_api_path + "action/maintenance" + game_id, json=pos, headers={"x-api-key": api_key})
+        response = sess.post(
+            base_api_path + "action/maintenance" + game_id,
+            json=pos,
+            headers={"x-api-key": api_key},
+        )
         if response.status_code == 200:
             return response.json()
 
@@ -170,7 +192,11 @@ def demolish(api_key, pos, game_id=None):
         global sess
         if not sess:
             sess = requests.Session()
-        response = sess.post(base_api_path + "action/demolish" + game_id, json=pos, headers={"x-api-key": api_key})
+        response = sess.post(
+            base_api_path + "action/demolish" + game_id,
+            json=pos,
+            headers={"x-api-key": api_key},
+        )
         if response.status_code == 200:
             return response.json()
 
@@ -190,7 +216,9 @@ def wait(api_key, game_id=None):
         global sess
         if not sess:
             sess = requests.Session()
-        response = sess.post(base_api_path + "action/wait" + game_id, headers={"x-api-key": api_key})
+        response = sess.post(
+            base_api_path + "action/wait" + game_id, headers={"x-api-key": api_key}
+        )
         if response.status_code == 200:
             return response.json()
 
@@ -210,9 +238,13 @@ def adjust_energy(api_key, energy_level, game_id=None):
         global sess
         if not sess:
             sess = requests.Session()
-        response = sess.post(base_api_path + "action/adjustEnergy" + game_id, json=energy_level, headers={"x-api-key": api_key})
+        response = sess.post(
+            base_api_path + "action/adjustEnergy" + game_id,
+            json=energy_level,
+            headers={"x-api-key": api_key},
+        )
         if response.status_code == 200:
-            return response.json() 
+            return response.json()
         print("Fatal Error: could not do action adjust energy level")
         print(str(response.status_code) + " " + response.reason + ": " + response.text)
     except RequestException as e:
@@ -229,7 +261,11 @@ def buy_upgrades(api_key, upgrade, game_id=None):
         global sess
         if not sess:
             sess = requests.Session()
-        response = sess.post(base_api_path + "action/buyUpgrade" + game_id, json=upgrade, headers={"x-api-key": api_key})
+        response = sess.post(
+            base_api_path + "action/buyUpgrade" + game_id,
+            json=upgrade,
+            headers={"x-api-key": api_key},
+        )
         if response.status_code == 200:
             return response.json()
 
@@ -249,7 +285,9 @@ def get_game_state(api_key, game_id=None):
         global sess
         if not sess:
             sess = requests.Session()
-        response = sess.get(base_api_path + "gameState" + game_id, headers={"x-api-key": api_key})
+        response = sess.get(
+            base_api_path + "gameState" + game_id, headers={"x-api-key": api_key}
+        )
         if response.status_code == 200:
             return response.json()
 

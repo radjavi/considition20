@@ -8,9 +8,9 @@ import api
 from game_layer import GameLayer
 
 load_dotenv()
-API_KEY = os.getenv('API_KEY')
+API_KEY = os.getenv("API_KEY")
 # The different map names can be found on considition.com/rules
-# Map name taken as command line argument. 
+# Map name taken as command line argument.
 # If left empty, the map "training1" will be selected.
 map_name = sys.argv[1] if len(sys.argv) > 1 else "training1"
 
@@ -27,10 +27,10 @@ def main():
             take_turn()
         print("Done with game: " + game_layer.game_state.game_id)
         print("Final score was: " + str(game_layer.get_score()["finalScore"]))
-    except KeyboardInterrupt: # End game session in case of exceptions
+    except KeyboardInterrupt:  # End game session in case of exceptions
         print(f"\nForce quit game: {game_layer.game_state.game_id}")
         game_layer.end_game()
-    except Exception as e: # Catching generic exceptions
+    except Exception as e:  # Catching generic exceptions
         print(f"Error: {e}")
         game_layer.end_game()
 
@@ -48,7 +48,9 @@ def take_turn():
                     x = i
                     y = j
                     break
-        game_layer.place_foundation((x, y), game_layer.game_state.available_residence_buildings[0].building_name)
+        game_layer.place_foundation(
+            (x, y), game_layer.game_state.available_residence_buildings[0].building_name
+        )
     else:
         the_only_residence = state.residences[0]
         if the_only_residence.build_progress < 100:
@@ -56,19 +58,40 @@ def take_turn():
         elif the_only_residence.health < 50:
             game_layer.maintenance((the_only_residence.X, the_only_residence.Y))
         elif the_only_residence.temperature < 18:
-            blueprint = game_layer.get_residence_blueprint(the_only_residence.building_name)
-            energy = blueprint.base_energy_need + 0.5 \
-                     + (the_only_residence.temperature - state.current_temp) * blueprint.emissivity / 1 \
-                     - the_only_residence.current_pop * 0.04
-            game_layer.adjust_energy_level((the_only_residence.X, the_only_residence.Y), energy)
+            blueprint = game_layer.get_residence_blueprint(
+                the_only_residence.building_name
+            )
+            energy = (
+                blueprint.base_energy_need
+                + 0.5
+                + (the_only_residence.temperature - state.current_temp)
+                * blueprint.emissivity
+                / 1
+                - the_only_residence.current_pop * 0.04
+            )
+            game_layer.adjust_energy_level(
+                (the_only_residence.X, the_only_residence.Y), energy
+            )
         elif the_only_residence.temperature > 24:
-            blueprint = game_layer.get_residence_blueprint(the_only_residence.building_name)
-            energy = blueprint.base_energy_need - 0.5 \
-                     + (the_only_residence.temperature - state.current_temp) * blueprint.emissivity / 1 \
-                     - the_only_residence.current_pop * 0.04
-            game_layer.adjust_energy_level((the_only_residence.X, the_only_residence.Y), energy)
+            blueprint = game_layer.get_residence_blueprint(
+                the_only_residence.building_name
+            )
+            energy = (
+                blueprint.base_energy_need
+                - 0.5
+                + (the_only_residence.temperature - state.current_temp)
+                * blueprint.emissivity
+                / 1
+                - the_only_residence.current_pop * 0.04
+            )
+            game_layer.adjust_energy_level(
+                (the_only_residence.X, the_only_residence.Y), energy
+            )
         elif state.available_upgrades[0].name not in the_only_residence.effects:
-            game_layer.buy_upgrade((the_only_residence.X, the_only_residence.Y), state.available_upgrades[0].name)
+            game_layer.buy_upgrade(
+                (the_only_residence.X, the_only_residence.Y),
+                state.available_upgrades[0].name,
+            )
         else:
             game_layer.wait()
     for message in game_layer.game_state.messages:

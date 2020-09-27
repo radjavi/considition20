@@ -6,7 +6,6 @@ t1:
 t2:
 	python main.py training2
 
-
 py3t1:
 	python3 main.py training1
 

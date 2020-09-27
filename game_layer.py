@@ -8,7 +8,7 @@ class GameLayer:
     def __init__(self, api_key):
         self.game_state: GameState = None
         self.api_key: str = api_key
-    
+
     def new_game(self, map_name: str = "training0"):
         """
         Create a new game.
@@ -16,8 +16,8 @@ class GameLayer:
         if map_name:
             game_options = {"mapName": map_name}
         else:
-            game_options = ""    
-        
+            game_options = ""
+
         self.game_state = GameState(api.new_game(self.api_key, game_options))
 
     def end_game(self):
@@ -30,7 +30,9 @@ class GameLayer:
         """
         Starts the game.
         """
-        self.game_state.update_state(api.start_game(self.api_key, self.game_state.game_id))
+        self.game_state.update_state(
+            api.start_game(self.api_key, self.game_state.game_id)
+        )
 
     def place_foundation(self, pos: Tuple[int, int], building_name: str):
         """
@@ -38,33 +40,41 @@ class GameLayer:
         :param pos: (int, int) - the position
         :param building_name: string - the name, check available_residence_buildings or available_residence_utilities for which buildings are available
         """
-        position = {'X': pos[0], 'Y': pos[1]}
-        foundation = {'Position': position, 'BuildingName': building_name}
-        self.game_state.update_state(api.place_foundation(self.api_key, foundation, self.game_state.game_id))
+        position = {"X": pos[0], "Y": pos[1]}
+        foundation = {"Position": position, "BuildingName": building_name}
+        self.game_state.update_state(
+            api.place_foundation(self.api_key, foundation, self.game_state.game_id)
+        )
 
     def build(self, pos: Tuple[int, int]):
         """
         Continues the construction of a building at the given position.
         :param pos: (int, int) - the position
         """
-        position = {'position': {"X": pos[0], "Y": pos[1]}}
-        self.game_state.update_state(api.build(self.api_key, position, self.game_state.game_id))
+        position = {"position": {"X": pos[0], "Y": pos[1]}}
+        self.game_state.update_state(
+            api.build(self.api_key, position, self.game_state.game_id)
+        )
 
     def maintenance(self, pos: Tuple[int, int]):
         """
         Performs maintenance on the building at the given position.
         :param pos: (int, int) - the position
         """
-        position = {'position': {"x": pos[0], "y": pos[1]}}
-        self.game_state.update_state(api.maintenance(self.api_key, position, self.game_state.game_id))
+        position = {"position": {"x": pos[0], "y": pos[1]}}
+        self.game_state.update_state(
+            api.maintenance(self.api_key, position, self.game_state.game_id)
+        )
 
     def demolish(self, pos: Tuple[int, int]):
         """
         Demolishes the building at the given position.
         :param pos: (int, int) - the position
         """
-        position = {'position': {"x": pos[0], "y": pos[1]}}
-        self.game_state.update_state(api.demolish(self.api_key, position, self.game_state.game_id))
+        position = {"position": {"x": pos[0], "y": pos[1]}}
+        self.game_state.update_state(
+            api.demolish(self.api_key, position, self.game_state.game_id)
+        )
 
     def adjust_energy_level(self, pos: Tuple[int, int], value: float):
         """
@@ -73,7 +83,13 @@ class GameLayer:
         :param value: float - the new requested value
         """
         position = {"x": pos[0], "y": pos[1]}
-        self.game_state.update_state(api.adjust_energy(self.api_key, {"position": position, "value": value}, self.game_state.game_id))
+        self.game_state.update_state(
+            api.adjust_energy(
+                self.api_key,
+                {"position": position, "value": value},
+                self.game_state.game_id,
+            )
+        )
 
     def wait(self):
         """
@@ -91,7 +107,13 @@ class GameLayer:
         :param upgrade: string - the upgrade to purchase
         """
         position = {"x": pos[0], "y": pos[1]}
-        self.game_state.update_state(api.buy_upgrades(self.api_key, {"position": position, "upgradeAction": upgrade}, self.game_state.game_id))
+        self.game_state.update_state(
+            api.buy_upgrades(
+                self.api_key,
+                {"position": position, "upgradeAction": upgrade},
+                self.game_state.game_id,
+            )
+        )
 
     def get_score(self):
         """
