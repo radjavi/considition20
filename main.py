@@ -1,3 +1,4 @@
+import operator
 import os
 import sys
 from pathlib import Path  # Python 3.6+ only
@@ -6,6 +7,7 @@ from dotenv import load_dotenv
 
 import api
 from game_layer import GameLayer
+from utils import calc_best_utility_location
 
 load_dotenv()
 API_KEY = os.getenv("API_KEY")
@@ -31,7 +33,8 @@ def main():
         print(f"\nForce quit game: {GAME_LAYER.game_state.game_id}")
         GAME_LAYER.end_game()
     except Exception as e:  # Catching generic exceptions
-        print(f"Error: {e}")
+        raise (e)
+        # print(f"Error: {e}")
         GAME_LAYER.end_game()
 
 
@@ -136,7 +139,7 @@ def place_residence(state):
                     x = i
                     y = j
                     break
-        state.map[x][y] = 1
+        state.map[x][y] = 2
         GAME_LAYER.place_foundation((x, y), residence.building_name)
         return True
 
@@ -144,18 +147,42 @@ def place_residence(state):
 def place_utility(state):
     # TODO: Add logic to place utilities near buildings
     if len(state.utilities) > 2:
-        return False 
+        return False
 
+    # Go through the map and find available slots
+    available_slots = []
+    for i in range(len(state.map)):
+        for j in range(len(state.map)):
+            if state.map[i][j] == 0:
+                # Nothing is standing here already lets add to available slots
+                available_slots.append((i, j))
+
+    score = calc_best_utility_location(state, available_slots)
     utility = _choose_utility(state)
+
     if utility and state.funds >= utility.cost:  # TODO: Re-Evaluate this check
-        for i in range(len(state.map)):
-            for j in range(len(state.map)):
-                if state.map[i][j] == 0:
-                    x = i
-                    y = j
-                    break
-        state.map[x][y] = 2
-        GAME_LAYER.place_foundation((x, y), utility.building_name)
+        sorted_best_options = sorted(score.items(), key=operator.itemgetter(1))
+        best_x = -1
+        best_y = -1
+
+        for (x, y), value in sorted_best_options:
+            if value == 0:
+                break
+
+            if state.map[x][y] == 0:
+                best_x = x
+                best_y = y
+                break
+
+        if best_x == -1 or best_y == -1:
+            return False
+
+        state.map[best_x][best_y] = 3
+        GAME_LAYER.place_foundation((best_x, best_y), utility.building_name)
+        # print("--------------")
+        # print("All values: ", sorted_best_options)
+        # print("BEST: ", best_x, best_y, score[best_x, best_y])
+        # print("--------------")
         return True
 
 
@@ -174,7 +201,10 @@ def _choose_utility(state):
     # TODO: Decision tree for chosing the right utility
     available_utilities = state.available_utility_buildings
     # Cost is only found on blueprint
-    utility_blueprints = [GAME_LAYER.get_utility_blueprint(utility.building_name) for utility in available_utilities]
+    utility_blueprints = [
+        GAME_LAYER.get_utility_blueprint(utility.building_name)
+        for utility in available_utilities
+    ]
     utility = max(utility_blueprints, key=lambda x: x.cost)
     # utility = sorted(utility_blueprints, key=lambda x: x.cost, reverse=True)[1]
     if state.funds > utility.cost:
@@ -206,7 +236,7 @@ def _choose_residence(state):
         state.available_residence_buildings,
         key=lambda x: x.cost,
     )
-    # return sorted(state.available_residence_buildings, key=lambda x: x.cost, reverse=True)[1]
+    # return sorted(state.available_residence_buildings, key=lambda x: x.cost, reverse=True)[2]
     # return min(state.available_residence_buildings, key=lambda x: x.cost)
     # import random
     # return random.choice(state.available_residence_buildings)
