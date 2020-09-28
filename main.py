@@ -47,6 +47,8 @@ def take_turn():
         pass
     elif available_upgrades(state):
         pass
+    elif place_utility(state):
+        pass
     elif place_residence(state):
         pass
     else:
@@ -63,6 +65,7 @@ def take_turn():
 def residence_maintenance(state):
     if len(state.residences) < 1:
         return False
+
     residence = min(state.residences, key=lambda x: x.health)
     blueprint = GAME_LAYER.get_residence_blueprint(residence.building_name)
     if residence.health < 70 and state.funds > blueprint.maintenance_cost:
@@ -120,6 +123,7 @@ def build_residence(state):
 
 # Place a new residence at an available spot
 def place_residence(state):
+    # TODO: Add logic to place building near utilities
     residence = _choose_residence(state)
     if (
         state.funds >= residence.cost
@@ -137,6 +141,24 @@ def place_residence(state):
         return True
 
 
+def place_utility(state):
+    # TODO: Add logic to place utilities near buildings
+    if len(state.utilities) > 2:
+        return False 
+
+    utility = _choose_utility(state)
+    if utility and state.funds >= utility.cost:  # TODO: Re-Evaluate this check
+        for i in range(len(state.map)):
+            for j in range(len(state.map)):
+                if state.map[i][j] == 0:
+                    x = i
+                    y = j
+                    break
+        state.map[x][y] = 2
+        GAME_LAYER.place_foundation((x, y), utility.building_name)
+        return True
+
+
 def available_upgrades(state):
     for residence in state.residences:
         upgrade = _choose_upgrade(state, residence)
@@ -146,6 +168,17 @@ def available_upgrades(state):
                 upgrade.name,
             )
             return True
+
+
+def _choose_utility(state):
+    # TODO: Decision tree for chosing the right utility
+    available_utilities = state.available_utility_buildings
+    # Cost is only found on blueprint
+    utility_blueprints = [GAME_LAYER.get_utility_blueprint(utility.building_name) for utility in available_utilities]
+    utility = max(utility_blueprints, key=lambda x: x.cost)
+    # utility = sorted(utility_blueprints, key=lambda x: x.cost, reverse=True)[1]
+    if state.funds > utility.cost:
+        return utility
 
 
 def _choose_upgrade(state, residence):
