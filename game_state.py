@@ -1,4 +1,5 @@
 from typing import List
+import copy
 
 
 class GameState:
@@ -38,8 +39,10 @@ class GameState:
         self.utilities: List[Utility] = []
         self.errors: List[str] = []
         self.messages: List[str] = []
+        # self.prev_state = copy.copy(self)  # Keep a shallow copy of the previous state
 
     def update_state(self, state):
+        # self.prev_state = copy.copy(self)  # Keep a shallow copy of the previous state
         self.turn = state["turn"]
         self.funds = state["funds"]
         self.total_co2 = state["totalCo2"]
@@ -133,6 +136,8 @@ class Residence(Building):
         self.requested_energy_in: float = residence["requestedEnergyIn"]
         self.happiness_per_tick_per_pop: float = residence["happinessPerTickPerPop"]
         self.health: int = residence["health"]
+        self.X = residence["position"]["x"]
+        self.Y = residence["position"]["y"]
 
 
 class Utility(Building):

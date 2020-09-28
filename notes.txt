@@ -1,4 +1,5 @@
-- max för upgrade och buildings är bäst just nu
-- får mycket errors när vi försöker reglera tempen på samma byggnad och den tillförda energin blir lägre än required för byggnaden, kanske prioritera ner i listan så vi slipper lägga så mycket turns på något som fastnar?
-- Checken i temp funktionen gör logiken bättre men försämrar resultat med
-  1000pt
+- Temperaturen regleras perfekt om Regulator upgrade köps. 'energy_wanted' formeln 
+  är från considition.com/rules
+- Lade till en kopia av förra rundans state (prev_state i GameState) men har
+  kommenterat ut det. Behövdes inte längre men kan komma att behövas.
+- Köper alla upgrades sorterat efter billigaste (Regulator är billigast)

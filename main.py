@@ -16,6 +16,7 @@ map_name = sys.argv[1] if len(sys.argv) > 1 else "training1"
 
 GAME_LAYER: GameLayer = GameLayer(API_KEY)
 
+
 def main():
     try:
         GAME_LAYER.new_game(map_name)
@@ -60,38 +61,53 @@ def take_turn():
 
 # Maintain a residence in need of maintenance
 def residence_maintenance(state):
-    for residence in state.residences:
-        blueprint = GAME_LAYER.get_residence_blueprint(residence.building_name)
-        if residence.health < 50 and state.funds > blueprint.maintenance_cost:
-            GAME_LAYER.maintenance((residence.X, residence.Y))
-            return True
+    if len(state.residences) < 1:
+        return False
+    residence = min(state.residences, key=lambda x: x.health)
+    blueprint = GAME_LAYER.get_residence_blueprint(residence.building_name)
+    if residence.health < 70 and state.funds > blueprint.maintenance_cost:
+        GAME_LAYER.maintenance((residence.X, residence.Y))
+        return True
 
 
 # Regulate the temperature of a residence if it's too low/high
 def regulate_temperature(state):
-    # TODO: Avoid getting stuck with the following error
-    # Error: The requested energy for the building at: (9, 4) can't be lower than the base energy need: 4.65
-    for residence in state.residences:
-        if (
-            residence.temperature < 18 or residence.temperature > 24
-        ) and state.funds > 150:
+    if len(state.residences) < 1 or state.turn < 2:
+        return False
+    optimal_temperature = 21
+    degrees_per_pop = 0.04
+    degrees_per_excess_mwh = 0.75
+    if state.funds >= 150:
+        residence = max(state.residences, key=lambda x: abs(x.temperature - 21))
+        if residence.build_progress >= 100:
+            # residence_prev_state = next(
+            #     r
+            #     for r in state.prev_state.residences
+            #     if residence.X == r.X and residence.Y == r.Y
+            # )
             blueprint = GAME_LAYER.get_residence_blueprint(residence.building_name)
-            energy = (
-                blueprint.base_energy_need
-                + (21 - residence.temperature)
-                + (residence.temperature - state.current_temp)
-                * blueprint.emissivity
-                / 1
-                - residence.current_pop * 0.04
+
+            base_energy_need = (
+                blueprint.base_energy_need + 1.8
+                if "Charger" in residence.effects
+                else blueprint.base_energy_need
             )
+            energy_wanted = (
+                optimal_temperature
+                - residence.temperature
+                - degrees_per_pop * residence.current_pop
+                + (residence.temperature - state.current_temp) * blueprint.emissivity
+            ) / degrees_per_excess_mwh + base_energy_need
+            energy = max(energy_wanted, base_energy_need + 1e-2)
 
-            # This check lowers our score by roughly 1000 points
-            # but avoids us from keep repeating same invalid turn
-            # if blueprint.base_energy_need > energy:
-            #     return False
-
-            GAME_LAYER.adjust_energy_level((residence.X, residence.Y), energy)
-            return True
+            if (
+                abs(residence.temperature - 21)
+                >= 1.5
+                # and abs(residence.temperature - residence_prev_state.temperature) <= 0.3
+                # and abs(energy - residence_prev_state.requested_energy_in) >= 0.1
+            ):
+                GAME_LAYER.adjust_energy_level((residence.X, residence.Y), energy)
+                return True
 
 
 # Build a residence that is under construction
@@ -105,7 +121,11 @@ def build_residence(state):
 # Place a new residence at an available spot
 def place_residence(state):
     residence = _choose_residence(state)
-    if state.funds >= residence.cost and state.housing_queue >= residence.max_pop:
+    if (
+        state.funds >= residence.cost
+        and state.housing_queue >= residence.max_pop / 4
+        # and state.current_temp >= state.max_temp * 0.75 # Don't build when it's cold outside
+    ):
         for i in range(len(state.map)):
             for j in range(len(state.map)):
                 if state.map[i][j] == 0:
@@ -118,9 +138,9 @@ def place_residence(state):
 
 
 def available_upgrades(state):
-    upgrade = _choose_upgrade(state)
     for residence in state.residences:
-        if state.funds > upgrade.cost and upgrade.name not in residence.effects:
+        upgrade = _choose_upgrade(state, residence)
+        if upgrade:
             GAME_LAYER.buy_upgrade(
                 (residence.X, residence.Y),
                 upgrade.name,
@@ -128,15 +148,31 @@ def available_upgrades(state):
             return True
 
 
-def _choose_upgrade(state):
+def _choose_upgrade(state, residence):
     # TODO: Decision tree for choosing the right upgrade
-    return max(state.available_upgrades, key=lambda x: x.cost)
-    # return min(state.available_upgrades, key=lambda x: x.cost)
+    return _choose_all_upgrades(state, residence)
+    # return _cheapest_upgrade(state, residence)
+
+
+def _choose_all_upgrades(state, residence):
+    for upgrade in sorted(state.available_upgrades, key=lambda x: x.cost):
+        if state.funds > upgrade.cost and upgrade.name not in residence.effects:
+            return upgrade
+
+
+def _cheapest_upgrade(state, residence):
+    upgrade = min(state.available_upgrades, key=lambda x: x.cost)
+    if state.funds > upgrade.cost and upgrade.name not in residence.effects:
+        return upgrade
 
 
 def _choose_residence(state):
     # TODO: Decision tree for choosing the right residence
-    return max(state.available_residence_buildings, key=lambda x: x.cost)
+    # TODO: Choose residence based on funds, map temperature, ...
+    return max(
+        state.available_residence_buildings,
+        key=lambda x: x.cost,
+    )
     # return sorted(state.available_residence_buildings, key=lambda x: x.cost, reverse=True)[1]
     # return min(state.available_residence_buildings, key=lambda x: x.cost)
     # import random
