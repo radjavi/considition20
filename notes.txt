@@ -1,0 +1,4 @@
+- max för upgrade och buildings är bäst just nu
+- får mycket errors när vi försöker reglera tempen på samma byggnad och den tillförda energin blir lägre än required för byggnaden, kanske prioritera ner i listan så vi slipper lägga så mycket turns på något som fastnar?
+- Checken i temp funktionen gör logiken bättre men försämrar resultat med
+  1000pt
