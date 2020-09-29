@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 import api
 from game_layer import GameLayer
-from utils import best_utility_location, best_residence_location
+from logic import best_residence_location, best_utility_location
 
 load_dotenv()
 API_KEY = os.getenv("API_KEY")
@@ -57,11 +57,11 @@ def strategy(state):
         pass
     elif build_residence(state):
         pass
-    elif residence_upgrade(state):
-        pass
     elif place_utility(state):
         pass
     elif place_residence(state):
+        pass
+    elif residence_upgrade(state):
         pass
     else:
         GAME_LAYER.wait()
@@ -147,7 +147,7 @@ def place_residence(state):
 
 def place_utility(state):
     # Alternate between utility and residence
-    if (len(state.utilities) + len(state.residences)) % 2 != 0:
+    if (len(state.utilities) + len(state.residences)) % 6:
         return False
 
     utility = _choose_utility(state)
@@ -175,6 +175,9 @@ def _choose_utility(state):
             (x for x in utility_blueprints if x.building_name == "Park"), None
         )
     else:
+        # If we decide to build mall but we don't have enough funds, let's just take a rain check
+        if state.funds < 22000:
+            return False
         utility = next(
             (x for x in utility_blueprints if x.building_name == "Mall"), None
         )
@@ -222,16 +225,28 @@ def _cheapest_upgrade(state, residence):
 
 
 def _choose_residence(state):
-    # TODO: Decision tree for choosing the right residence
-    # TODO: Choose residence based on funds, map temperature, ...
-    return max(
-        state.available_residence_buildings,
-        key=lambda x: x.cost,
-    )
-    # return sorted(state.available_residence_buildings, key=lambda x: x.cost, reverse=True)[2]
-    # return min(state.available_residence_buildings, key=lambda x: x.cost)
-    # import random
-    # return random.choice(state.available_residence_buildings)
+    # TODO: Decision tree for choosing the right residence, based on funds, map condition, etc.
+    # TEST: If we have less than 4 of the most expensive buildings build eco friendly houses
+    if (
+        len(
+            [
+                residence
+                for residence in state.residences
+                if residence.building_name
+                == max(
+                    state.available_residence_buildings, key=lambda x: x.cost
+                ).building_name
+            ]
+        )
+        < 4
+    ):
+        return max(
+            state.available_residence_buildings,
+            key=lambda x: x.cost,
+        )
+    return sorted(
+        state.available_residence_buildings, key=lambda x: x.cost, reverse=True
+    )[1]
 
 
 if __name__ == "__main__":
