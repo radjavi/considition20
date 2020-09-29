@@ -33,9 +33,9 @@ def main():
         print(f"\nForce quit game: {GAME_LAYER.game_state.game_id}")
         GAME_LAYER.end_game()
     except Exception as e:  # Catching generic exceptions
+        GAME_LAYER.end_game()
         raise (e)
         # print(f"Error: {e}")
-        GAME_LAYER.end_game()
 
 
 def take_turn():
@@ -136,12 +136,9 @@ def place_residence(state):
         for i in range(len(state.map)):
             for j in range(len(state.map)):
                 if state.map[i][j] == 0:
-                    x = i
-                    y = j
-                    break
-        state.map[x][y] = 2
-        GAME_LAYER.place_foundation((x, y), residence.building_name)
-        return True
+                    state.map[i][j] = 2
+                    GAME_LAYER.place_foundation((i, j), residence.building_name)
+                    return True
 
 
 def place_utility(state):
