@@ -41,6 +41,15 @@ def main():
 def take_turn():
     state = GAME_LAYER.game_state
 
+    strategy(state)
+
+    for message in GAME_LAYER.game_state.messages:
+        print(message)
+    for error in GAME_LAYER.game_state.errors:
+        print("Error: " + error)
+
+
+def strategy(state):
     # Take one of the following actions in order of priority #
     if residence_maintenance(state):
         pass
@@ -56,12 +65,6 @@ def take_turn():
         pass
     else:
         GAME_LAYER.wait()
-    # --- #
-
-    for message in GAME_LAYER.game_state.messages:
-        print(message)
-    for error in GAME_LAYER.game_state.errors:
-        print("Error: " + error)
 
 
 # Maintain a residence in need of maintenance
