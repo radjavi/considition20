@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 import api
 from game_layer import GameLayer
-from utils import calc_best_utility_location
+from utils import best_utility_location, best_residence_location
 
 load_dotenv()
 API_KEY = os.getenv("API_KEY")
@@ -132,58 +132,54 @@ def place_residence(state):
     # TODO: Add logic to place building near utilities
     residence = _choose_residence(state)
     if (
-        state.funds >= residence.cost
-        and state.housing_queue >= residence.max_pop / 4
+        state.funds > residence.cost
+        and state.housing_queue >= 15
         # and state.current_temp >= state.max_temp * 0.75 # Don't build when it's cold outside
     ):
-        for i in range(len(state.map)):
-            for j in range(len(state.map)):
-                if state.map[i][j] == 0:
-                    state.map[i][j] = 2
-                    GAME_LAYER.place_foundation((i, j), residence.building_name)
-                    return True
+        x, y = best_residence_location(state)
+        if x < 0 or y < 0:
+            return False
+
+        state.map[x][y] = 2
+        GAME_LAYER.place_foundation((x, y), residence.building_name)
+        return True
 
 
 def place_utility(state):
-    # TODO: Add logic to place utilities near buildings
-    if len(state.utilities) > 2:
+    # Alternate between utility and residence
+    if (len(state.utilities) + len(state.residences)) % 2 != 0:
         return False
 
-    # Go through the map and find available slots
-    available_slots = []
-    for i in range(len(state.map)):
-        for j in range(len(state.map)):
-            if state.map[i][j] == 0:
-                # Nothing is standing here already lets add to available slots
-                available_slots.append((i, j))
-
-    score = calc_best_utility_location(state, available_slots)
     utility = _choose_utility(state)
-
-    if utility and state.funds >= utility.cost:  # TODO: Re-Evaluate this check
-        sorted_best_options = sorted(score.items(), key=operator.itemgetter(1))
-        best_x = -1
-        best_y = -1
-
-        for (x, y), value in sorted_best_options:
-            if value == 0:
-                break
-
-            if state.map[x][y] == 0:
-                best_x = x
-                best_y = y
-                break
-
-        if best_x == -1 or best_y == -1:
+    if utility and state.funds > utility.cost:
+        x, y = best_utility_location(state)
+        if x < 0 or y < 0:
             return False
 
-        state.map[best_x][best_y] = 3
-        GAME_LAYER.place_foundation((best_x, best_y), utility.building_name)
-        # print("--------------")
-        # print("All values: ", sorted_best_options)
-        # print("BEST: ", best_x, best_y, score[best_x, best_y])
-        # print("--------------")
+        state.map[x][y] = 3
+        GAME_LAYER.place_foundation((x, y), utility.building_name)
         return True
+
+
+def _choose_utility(state):
+    available_utilities = state.available_utility_buildings
+    # Cost is only found on blueprint
+    utility_blueprints = [
+        GAME_LAYER.get_utility_blueprint(utility.building_name)
+        for utility in available_utilities
+    ]
+
+    # If mall is already placed, choose Park
+    if next((x for x in state.utilities if x.building_name == "Mall"), None):
+        utility = next(
+            (x for x in utility_blueprints if x.building_name == "Park"), None
+        )
+    else:
+        utility = next(
+            (x for x in utility_blueprints if x.building_name == "Mall"), None
+        )
+    if state.funds > utility.cost:
+        return utility
 
 
 def residence_upgrade(state):
@@ -197,28 +193,24 @@ def residence_upgrade(state):
             return True
 
 
-def _choose_utility(state):
-    # TODO: Decision tree for chosing the right utility
-    available_utilities = state.available_utility_buildings
-    # Cost is only found on blueprint
-    utility_blueprints = [
-        GAME_LAYER.get_utility_blueprint(utility.building_name)
-        for utility in available_utilities
-    ]
-    utility = max(utility_blueprints, key=lambda x: x.cost)
-    # utility = sorted(utility_blueprints, key=lambda x: x.cost, reverse=True)[1]
-    if state.funds > utility.cost:
-        return utility
-
-
 def _choose_upgrade(state, residence):
     # TODO: Decision tree for choosing the right upgrade
     return _choose_all_upgrades(state, residence)
+    # return _choose_upgrades(state, residence, ["Regulator", "Charger"])
     # return _cheapest_upgrade(state, residence)
 
 
 def _choose_all_upgrades(state, residence):
     for upgrade in sorted(state.available_upgrades, key=lambda x: x.cost):
+        if state.funds > upgrade.cost and upgrade.name not in residence.effects:
+            return upgrade
+
+
+def _choose_upgrades(state, residence, upgrades):
+    for upgrade in sorted(
+        (x for x in state.available_upgrades if x.name in upgrades),
+        key=lambda x: x.cost,
+    ):
         if state.funds > upgrade.cost and upgrade.name not in residence.effects:
             return upgrade
 
