@@ -57,7 +57,7 @@ def strategy(state):
         pass
     elif build_residence(state):
         pass
-    elif available_upgrades(state):
+    elif residence_upgrade(state):
         pass
     elif place_utility(state):
         pass
@@ -186,7 +186,7 @@ def place_utility(state):
         return True
 
 
-def available_upgrades(state):
+def residence_upgrade(state):
     for residence in state.residences:
         upgrade = _choose_upgrade(state, residence)
         if upgrade:
