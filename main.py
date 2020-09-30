@@ -31,6 +31,8 @@ def main():
             take_turn()
         print("Done with game: " + GAME_LAYER.game_state.game_id)
         print("Final score was: " + str(GAME_LAYER.get_score()["finalScore"]))
+        print("Total happiness:", GAME_LAYER.game_state.total_happiness)
+        print("Total CO2:", GAME_LAYER.game_state.total_co2)
     except KeyboardInterrupt:  # End game session in case of exceptions
         print(f"\nForce quit game: {GAME_LAYER.game_state.game_id}")
         GAME_LAYER.end_game()
@@ -200,12 +202,9 @@ def residence_upgrade(state):
 
 def _choose_upgrade(state, residence):
     # TODO: Decision tree for choosing the right upgrade
-    # return _choose_all_upgrades(state, residence)
+    return _choose_all_upgrades(state, residence)
     # return _cheapest_upgrade(state, residence)
-    if regulator := _choose_upgrades(state, residence, ["Regulator"]):
-        return regulator
-    elif state.total_co2 >= CO2_LIMIT or state.funds > FUNDS_LOW:
-        return _choose_upgrades(state, residence, ["Charger"])
+    # return _eco_happiness_upgrades(state, residence)
 
 
 def _choose_all_upgrades(state, residence):
@@ -214,12 +213,23 @@ def _choose_all_upgrades(state, residence):
             return upgrade
 
 
+def _eco_happiness_upgrades(state, residence):
+    if regulator := _choose_upgrades(state, residence, ["Regulator"]):
+        return regulator
+    elif state.total_co2 >= CO2_LIMIT or state.funds > FUNDS_LOW:
+        return _choose_upgrades(state, residence, ["Charger", "Playground"])
+
+
 def _choose_upgrades(state, residence, upgrades):
     for upgrade in sorted(
-        (x for x in state.available_upgrades if x.name in upgrades),
+        (
+            x
+            for x in state.available_upgrades
+            if x.name in upgrades and x.name not in residence.effects
+        ),
         key=lambda x: x.cost,
     ):
-        if state.funds > upgrade.cost and upgrade.name not in residence.effects:
+        if state.funds > upgrade.cost:
             return upgrade
 
 
@@ -236,28 +246,55 @@ def _choose_residence(state):
         for x in state.available_residence_buildings
         if x.release_tick <= state.turn and state.funds > x.cost
     ]
-    if (
-        feasible_buildings
-        and sum(
-            GAME_LAYER.get_blueprint(x.building_name).maintenance_cost
-            for x in state.residences
-        )
-        < state.funds * 0.5
-    ):
-        if state.total_co2 < state.turn * (CO2_MAX / state.max_turns):
-            if state.funds < FUNDS_LOW:
+    if feasible_buildings and max_total_maintenance_cost(
+        state
+    ) <= state.funds - 5 * min_total_income(state):
+        if state.total_co2 < CO2_LIMIT:
+            if state.funds < FUNDS_LOW and len(state.residences) > 0:
                 return False
-            if state.funds < FUNDS_MED:
-                # Maximize income
+            elif state.funds < FUNDS_MED:
+                # Maximize population
                 return max(
-                    feasible_buildings, key=lambda x: x.income_per_pop * x.max_pop
+                    [
+                        x
+                        for x in feasible_buildings
+                        if len(
+                            [
+                                y
+                                for y in state.residences
+                                if x.building_name == y.building_name
+                            ]
+                        )
+                        < 4
+                    ],
+                    key=lambda x: x.max_pop,
+                    default=None,
                 )
             elif state.funds < FUNDS_HIGH:
                 # Maximize happiness
-                return max(feasible_buildings, key=lambda x: x.max_happiness)
+                return max(
+                    feasible_buildings, key=lambda x: x.max_happiness * x.max_pop
+                )
         else:
             # Minimize co2
             return min(feasible_buildings, key=lambda x: x.co2_cost + x.max_pop * 0.03)
+
+
+# The current maximum maintenance cost (i.e. excluding any upgrades)
+def max_total_maintenance_cost(state):
+    return sum(
+        GAME_LAYER.get_blueprint(x.building_name).maintenance_cost
+        for x in state.residences
+    )
+
+
+# The current minimum total income (i.e. excluding any upgrades)
+def min_total_income(state):
+    return sum(
+        GAME_LAYER.get_blueprint(x.building_name).income_per_pop
+        * GAME_LAYER.get_blueprint(x.building_name).max_pop
+        for x in state.residences
+    )
 
 
 if __name__ == "__main__":
