@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 import api
 from game_layer import GameLayer
 from logic import best_residence_location, best_utility_location
+from constants import *
 
 load_dotenv()
 API_KEY = os.getenv("API_KEY")
@@ -25,6 +26,7 @@ def main():
         print("Starting game: " + GAME_LAYER.game_state.game_id)
         print("Map:", map_name)
         GAME_LAYER.start_game()
+        preprocess_map()  # Make neccessary pre-processing of the map
         while GAME_LAYER.game_state.turn < GAME_LAYER.game_state.max_turns:
             take_turn()
         print("Done with game: " + GAME_LAYER.game_state.game_id)
@@ -36,6 +38,18 @@ def main():
         GAME_LAYER.end_game()
         raise (e)
         # print(f"Error: {e}")
+
+
+# Modify map numbers to satisfy custom identifiers
+def preprocess_map():
+    print("Preprocessing map...")
+    state = GAME_LAYER.game_state
+    for residence in state.residences:
+        x, y = residence.X, residence.Y
+        state.map[x][y] = POS_RESIDENCE
+    for utility in state.utilities:
+        x, y = utility.X, utility.Y
+        state.map[x][y] = POS_UTILITY
 
 
 def take_turn():
@@ -53,6 +67,8 @@ def strategy(state):
     # Take one of the following actions in order of priority #
     if residence_maintenance(state):
         pass
+    elif residence_upgrade(state):
+        pass
     elif regulate_temperature(state):
         pass
     elif build_residence(state):
@@ -60,8 +76,6 @@ def strategy(state):
     elif place_utility(state):
         pass
     elif place_residence(state):
-        pass
-    elif residence_upgrade(state):
         pass
     else:
         GAME_LAYER.wait()
@@ -89,11 +103,6 @@ def regulate_temperature(state):
     if state.funds >= 150:
         residence = max(state.residences, key=lambda x: abs(x.temperature - 21))
         if residence.build_progress >= 100:
-            # residence_prev_state = next(
-            #     r
-            #     for r in state.prev_state.residences
-            #     if residence.X == r.X and residence.Y == r.Y
-            # )
             blueprint = GAME_LAYER.get_residence_blueprint(residence.building_name)
 
             base_energy_need = (
@@ -109,12 +118,7 @@ def regulate_temperature(state):
             ) / degrees_per_excess_mwh + base_energy_need
             energy = max(energy_wanted, base_energy_need + 1e-2)
 
-            if (
-                abs(residence.temperature - 21)
-                >= 1.5
-                # and abs(residence.temperature - residence_prev_state.temperature) <= 0.3
-                # and abs(energy - residence_prev_state.requested_energy_in) >= 0.1
-            ):
+            if abs(residence.temperature - 21) >= 1.5:
                 GAME_LAYER.adjust_energy_level((residence.X, residence.Y), energy)
                 return True
 
@@ -129,10 +133,9 @@ def build_residence(state):
 
 # Place a new residence at an available spot
 def place_residence(state):
-    # TODO: Add logic to place building near utilities
     residence = _choose_residence(state)
     if (
-        state.funds > residence.cost
+        residence
         and state.housing_queue >= 15
         # and state.current_temp >= state.max_temp * 0.75 # Don't build when it's cold outside
     ):
@@ -140,7 +143,7 @@ def place_residence(state):
         if x < 0 or y < 0:
             return False
 
-        state.map[x][y] = 2
+        state.map[x][y] = POS_RESIDENCE
         GAME_LAYER.place_foundation((x, y), residence.building_name)
         return True
 
@@ -156,7 +159,7 @@ def place_utility(state):
         if x < 0 or y < 0:
             return False
 
-        state.map[x][y] = 3
+        state.map[x][y] = POS_UTILITY
         GAME_LAYER.place_foundation((x, y), utility.building_name)
         return True
 
@@ -175,18 +178,17 @@ def _choose_utility(state):
             (x for x in utility_blueprints if x.building_name == "Park"), None
         )
     else:
-        # If we decide to build mall but we don't have enough funds, let's just take a rain check
-        if state.funds < 22000:
-            return False
         utility = next(
             (x for x in utility_blueprints if x.building_name == "Mall"), None
         )
-    if state.funds > utility.cost:
+    if state.funds > utility.cost * 1.5:
         return utility
 
 
 def residence_upgrade(state):
     for residence in state.residences:
+        if residence.build_progress < 100:
+            continue
         upgrade = _choose_upgrade(state, residence)
         if upgrade:
             GAME_LAYER.buy_upgrade(
@@ -198,9 +200,12 @@ def residence_upgrade(state):
 
 def _choose_upgrade(state, residence):
     # TODO: Decision tree for choosing the right upgrade
-    return _choose_all_upgrades(state, residence)
-    # return _choose_upgrades(state, residence, ["Regulator", "Charger"])
+    # return _choose_all_upgrades(state, residence)
     # return _cheapest_upgrade(state, residence)
+    if regulator := _choose_upgrades(state, residence, ["Regulator"]):
+        return regulator
+    elif state.total_co2 >= CO2_LIMIT or state.funds > FUNDS_LOW:
+        return _choose_upgrades(state, residence, ["Charger"])
 
 
 def _choose_all_upgrades(state, residence):
@@ -226,27 +231,33 @@ def _cheapest_upgrade(state, residence):
 
 def _choose_residence(state):
     # TODO: Decision tree for choosing the right residence, based on funds, map condition, etc.
-    # TEST: If we have less than 4 of the most expensive buildings build eco friendly houses
+    feasible_buildings = [
+        x
+        for x in state.available_residence_buildings
+        if x.release_tick <= state.turn and state.funds > x.cost
+    ]
     if (
-        len(
-            [
-                residence
-                for residence in state.residences
-                if residence.building_name
-                == max(
-                    state.available_residence_buildings, key=lambda x: x.cost
-                ).building_name
-            ]
+        feasible_buildings
+        and sum(
+            GAME_LAYER.get_blueprint(x.building_name).maintenance_cost
+            for x in state.residences
         )
-        < 4
+        < state.funds * 0.5
     ):
-        return max(
-            state.available_residence_buildings,
-            key=lambda x: x.cost,
-        )
-    return sorted(
-        state.available_residence_buildings, key=lambda x: x.cost, reverse=True
-    )[1]
+        if state.total_co2 < state.turn * (CO2_MAX / state.max_turns):
+            if state.funds < FUNDS_LOW:
+                return False
+            if state.funds < FUNDS_MED:
+                # Maximize income
+                return max(
+                    feasible_buildings, key=lambda x: x.income_per_pop * x.max_pop
+                )
+            elif state.funds < FUNDS_HIGH:
+                # Maximize happiness
+                return max(feasible_buildings, key=lambda x: x.max_happiness)
+        else:
+            # Minimize co2
+            return min(feasible_buildings, key=lambda x: x.co2_cost + x.max_pop * 0.03)
 
 
 if __name__ == "__main__":
