@@ -33,8 +33,8 @@ def best_utility_location(state):
                     POS_RESIDENCE,
                 ]:
                     scores[(x1, y1)] += 1 / d
-                if d <= 3 and state.map[x2][y2] == 3:
-                    scores[(x1, y1)] = -1e5
+                # if d <= 3 and state.map[x2][y2] == 3:
+                #     scores[(x1, y1)] = -1e5
     if not scores:
         return (-1, -1)
     return max(scores, key=lambda x: scores[x])  # Key with max value
