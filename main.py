@@ -53,6 +53,8 @@ def strategy(state):
     # Take one of the following actions in order of priority #
     if residence_maintenance(state):
         pass
+    elif residence_regulator(state):
+        pass
     elif regulate_temperature(state):
         pass
     elif build_residence(state):
@@ -183,6 +185,18 @@ def _choose_utility(state):
         )
     if state.funds > utility.cost:
         return utility
+
+
+def residence_regulator(state):
+    for residence in state.residences:
+        if residence.build_progress < 100:
+            continue
+        if "Regulator" not in residence.effects:
+            GAME_LAYER.buy_upgrade(
+                (residence.X, residence.Y),
+                "Regulator",
+            )
+            return True
 
 
 def residence_upgrade(state):
