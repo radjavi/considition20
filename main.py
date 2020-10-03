@@ -7,7 +7,12 @@ from dotenv import load_dotenv
 
 import api
 from game_layer import GameLayer
-from logic import best_residence_location, best_utility_location
+from logic import (
+    building_score,
+    calculate_energy_need,
+    best_residence_location,
+    best_utility_location,
+)
 from constants import *
 
 load_dotenv()
@@ -29,6 +34,7 @@ def main():
         print("Map:", map_name)
         GAME_LAYER.start_game()
         preprocess_map()  # Make neccessary pre-processing of the map
+        # clean_map()  # Demolish existing buildings
         while GAME_LAYER.game_state.turn < GAME_LAYER.game_state.max_turns:
             take_turn()
         print("Done with game: " + GAME_LAYER.game_state.game_id)
@@ -53,7 +59,22 @@ def preprocess_map():
         state.map[x][y] = POS_RESIDENCE
     for utility in state.utilities:
         x, y = utility.X, utility.Y
-        state.map[x][y] = POS_UTILITY
+        if utility.building_name == "Park":
+            state.map[x][y] = POS_PARK
+        elif utility.building_name == "Mall":
+            state.map[x][y] = POS_MALL
+        elif utility.building_name == "WindTurbine":
+            state.map[x][y] = POS_WINDTURBINE
+
+
+def clean_map():
+    print("Cleaning up map...")
+    state = GAME_LAYER.game_state
+    if len(state.residences) > 0:
+        for residence in state.residences:
+            GAME_LAYER.demolish((residence.X, residence.Y))
+    else:
+        print("Nothing to clean up.")
 
 
 def take_turn():
@@ -75,11 +96,11 @@ def strategy(state):
         pass
     elif regulate_temperature(state):
         pass
-    elif build_residence(state):
-        pass
-    elif place_utility(state):
+    elif perform_construction(state):
         pass
     elif place_residence(state):
+        pass
+    elif place_utility(state):
         pass
     elif residence_upgrade(state):
         pass
@@ -94,7 +115,12 @@ def residence_maintenance(state):
 
     residence = min(state.residences, key=lambda x: x.health)
     blueprint = GAME_LAYER.get_residence_blueprint(residence.building_name)
-    if residence.health < HEALTH_MIN and state.funds > blueprint.maintenance_cost:
+    if (
+        residence.health < HEALTH_MIN
+        and residence.happiness_per_tick_per_pop
+        < GAME_LAYER.get_blueprint(residence.building_name).max_happiness + 0.16
+        and state.funds - blueprint.maintenance_cost > FUNDS_MIN
+    ):
         GAME_LAYER.maintenance((residence.X, residence.Y))
         return True
 
@@ -103,37 +129,28 @@ def residence_maintenance(state):
 def regulate_temperature(state):
     if len(state.residences) < 1 or state.turn < 2:
         return False
-    optimal_temperature = 21
-    degrees_per_pop = 0.04
-    degrees_per_excess_mwh = 0.75
-    if state.funds >= 150:
+    if state.funds > 150:
         residence = max(state.residences, key=lambda x: abs(x.temperature - 21))
         if residence.build_progress >= 100:
-            blueprint = GAME_LAYER.get_residence_blueprint(residence.building_name)
-
-            base_energy_need = (
-                blueprint.base_energy_need + 1.8
-                if "Charger" in residence.effects
-                else blueprint.base_energy_need
+            blueprint = blueprint = GAME_LAYER.get_residence_blueprint(
+                residence.building_name
             )
-            energy_wanted = (
-                optimal_temperature
-                - residence.temperature
-                - degrees_per_pop * residence.current_pop
-                + (residence.temperature - state.current_temp) * blueprint.emissivity
-            ) / degrees_per_excess_mwh + base_energy_need
-            energy = max(energy_wanted, base_energy_need + 1e-2)
+            energy = calculate_energy_need(state, residence, blueprint)
 
             if abs(residence.temperature - 21) >= 1.5:
                 GAME_LAYER.adjust_energy_level((residence.X, residence.Y), energy)
                 return True
 
 
-# Build a residence that is under construction
-def build_residence(state):
+# Perform construction on a residence or utility that is not finished
+def perform_construction(state):
     for residence in state.residences:
         if residence.build_progress < 100:
             GAME_LAYER.build((residence.X, residence.Y))
+            return True
+    for utility in state.utilities:
+        if utility.build_progress < 100:
+            GAME_LAYER.build((utility.X, utility.Y))
             return True
 
 
@@ -142,9 +159,8 @@ def place_residence(state):
     residence = _choose_residence(state)
     if (
         residence
-        and state.funds >= residence.cost + max_total_maintenance_cost(state)
-        and state.housing_queue >= 15
-        # and state.current_temp >= state.max_temp * 0.75 # Don't build when it's cold outside
+        and state.funds - residence.cost >= FUNDS_MIN
+        and state.queue_happiness < 20
     ):
         x, y = best_residence_location(state)
         if x < 0 or y < 0:
@@ -159,18 +175,21 @@ def place_residence(state):
 
 def place_utility(state):
     # Alternate between utility and residence
-    if len(state.residences) >= sum(RESIDENCE_LIMITS.values()):
-        pass
-    elif (len(state.utilities) + len(state.residences)) % 6:
+    if (len(state.utilities) + len(state.residences)) % 3:
         return False
 
     utility = _choose_utility(state)
-    if utility and state.funds > utility.cost:
-        x, y = best_utility_location(state)
+    if utility and state.funds - utility.cost > FUNDS_MIN:
+        x, y = best_utility_location(state, utility.building_name)
         if x < 0 or y < 0:
             return False
 
-        state.map[x][y] = POS_UTILITY
+        if utility.building_name == "Park":
+            state.map[x][y] = POS_PARK
+        elif utility.building_name == "Mall":
+            state.map[x][y] = POS_MALL
+        elif utility.building_name == "WindTurbine":
+            state.map[x][y] = POS_WINDTURBINE
         GAME_LAYER.place_foundation((x, y), utility.building_name)
         return True
 
@@ -183,17 +202,29 @@ def _choose_utility(state):
         for utility in available_utilities
     ]
 
-    # If mall is already placed, choose Park
-    if next((x for x in state.utilities if x.building_name == "Mall"), None):
+    # # If mall is already placed, choose WindTurbine or Park
+    # if next((x for x in state.utilities if x.building_name == "Mall"), None):
+    #     utility = next(
+    #         (x for x in utility_blueprints if x.building_name == "WindTurbine"), None
+    #     )
+    # else:
+    #     utility = next(
+    #         (x for x in utility_blueprints if x.building_name == "Mall"), None
+    #     )
+    if len(state.residences) >= 5:
         utility = next(
-            (x for x in utility_blueprints if x.building_name == "Park"), None
+            (x for x in utility_blueprints if x.building_name == "WindTurbine"), None
         )
-    else:
+    # If mall is already placed, choose Park
+    elif state.funds > FUNDS_MED:
         utility = next(
             (x for x in utility_blueprints if x.building_name == "Mall"), None
         )
-    if state.funds > utility.cost:
-        return utility
+    else:
+        utility = next(
+            (x for x in utility_blueprints if x.building_name == "Park"), None
+        )
+    return utility
 
 
 def residence_regulator(state):
@@ -223,23 +254,20 @@ def residence_upgrade(state):
 
 def _choose_upgrade(state, residence):
     # TODO: Decision tree for choosing the right upgrade
-    # return _choose_all_upgrades(state, residence)
+    return _choose_all_upgrades(state, residence)
     # return _cheapest_upgrade(state, residence)
-    # return _eco_happiness_upgrades(state, residence)
-    return _choose_upgrades(state, residence, ["Caretaker", "Charger", "Playground"])
+    # return _choose_upgrades(
+    #     state, residence, ["SolarPanel", "Caretaker", "Charger", "Playground"]
+    # )
 
 
 def _choose_all_upgrades(state, residence):
     for upgrade in sorted(state.available_upgrades, key=lambda x: x.cost):
-        if state.funds > upgrade.cost and upgrade.name not in residence.effects:
+        if (
+            state.funds - upgrade.cost > FUNDS_MED
+            and upgrade.name not in residence.effects
+        ):
             return upgrade
-
-
-def _eco_happiness_upgrades(state, residence):
-    if approx_maintenance_cost_per_tick(state) >= approx_income_per_tick(state):
-        return _choose_upgrades(state, residence, ["Caretaker"])
-    elif state.total_co2 >= CO2_LIMIT or state.funds > FUNDS_MED:
-        return _choose_upgrades(state, residence, ["Charger", "Playground"])
 
 
 def _choose_upgrades(state, residence, upgrades):
@@ -251,63 +279,57 @@ def _choose_upgrades(state, residence, upgrades):
         ),
         key=lambda x: x.cost,
     ):
-        if state.funds > upgrade.cost:
+        if state.funds - upgrade.cost >= FUNDS_MED:
             return upgrade
 
 
 def _cheapest_upgrade(state, residence):
     upgrade = min(state.available_upgrades, key=lambda x: x.cost)
-    if state.funds > upgrade.cost and upgrade.name not in residence.effects:
+    if state.funds - upgrade.cost > FUNDS_MIN and upgrade.name not in residence.effects:
         return upgrade
 
 
 def _choose_residence(state):
-    feasible_buildings = [
+    return _optimal_building(state, _feasible_buildings(state))
+
+
+def _choose_residence2(state):
+    return _optimal_building2(state, _feasible_buildings2(state))
+
+
+def _feasible_buildings(state):
+    return [
+        x for x in state.available_residence_buildings if x.release_tick <= state.turn
+    ]
+
+
+def _feasible_buildings2(state):
+    return [
         x
         for x in state.available_residence_buildings
         if x.release_tick <= state.turn
-        and x.max_pop >= state.housing_queue
         and len([y for y in state.residences if x.building_name == y.building_name])
         < RESIDENCE_LIMITS[x.building_name]
     ]
-    building = min(
-        feasible_buildings,
-        key=lambda x: x.co2_cost + x.max_pop * CO2_PER_POP,
-        default=None,
-    )
-    if building and state.turn > LAST_RESIDENCE_BUILD_TURN + (
-        state.max_turns * 0.2
-    ) / sum(RESIDENCE_LIMITS.values()):
-        return building
 
 
-# The current maximum maintenance cost (i.e. excluding any upgrades)
-def max_total_maintenance_cost(state):
-    return sum(
-        GAME_LAYER.get_blueprint(x.building_name).maintenance_cost
-        for x in state.residences
-    )
+# Choose the building that maximizes building_score
+def _optimal_building(state, feasible_buildings):
+    return max(feasible_buildings, key=lambda x: building_score(state, x), default=None)
 
 
-def approx_maintenance_cost_per_tick(state):
-    return sum(
-        GAME_LAYER.get_blueprint(x.building_name).maintenance_cost
-        / ((100 - HEALTH_MIN) / GAME_LAYER.get_blueprint(x.building_name).decay_rate)
-        for x in state.residences
-    )
-
-
-# Approximation of income per tick (excluding any upgrades)
-def approx_income_per_tick(state):
-    return sum(
-        GAME_LAYER.get_blueprint(x.building_name).income_per_pop
-        * GAME_LAYER.get_blueprint(x.building_name).max_pop
-        for x in state.residences
-    ) + sum(
-        GAME_LAYER.get_effect(e).building_income_increase
-        for x in state.utilities
-        for e in GAME_LAYER.get_blueprint(x.building_name).effects
-    )
+# Choose the building that matches the housing queue closest
+def _optimal_building2(state, feasible_buildings):
+    func = lambda x: abs(state.housing_queue - x.max_pop)
+    # Building with max_pop that matches housing queue closest
+    building = min(feasible_buildings, key=func, default=None)
+    if building:
+        buildings = [x for x in feasible_buildings if func(x) == func(building)]
+        # If multiple buldings, choose based on second condition
+        if len(buildings) > 1:
+            return max(buildings, key=lambda x: x.max_pop)
+        else:
+            return building
 
 
 if __name__ == "__main__":

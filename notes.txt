@@ -2,7 +2,9 @@ Enums för map:
   - 0: Empty
   - 1: Tree (occupied)
   - 2: Residence (occupied)
-  - 3: Utility (occupied)
+  - 3: Park (occupied)
+  - 4: Mall (occupied)
+  - 5: WindTurbine (occupied)
 
 - Temperaturen regleras perfekt om Regulator upgrade köps. 'energy_wanted' formeln 
   är från considition.com/rules

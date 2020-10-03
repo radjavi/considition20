@@ -1,5 +1,55 @@
 from collections import defaultdict
 from constants import *
+import math
+
+
+def building_score(state, building):
+    nr_ticks = state.max_turns - state.turn - 1 - math.ceil(100 / building.build_speed)
+    happiness = (
+        (
+            building.max_happiness
+            + (
+                building.max_happiness * 0.1
+                if not any(
+                    building.building_name == y.building_name for y in state.residences
+                )
+                else 0
+            )
+        )
+        * building.max_pop
+        * nr_ticks
+    )
+    co2 = (
+        building.co2_cost
+        + building.max_pop * CO2_PER_POP * nr_ticks
+        + 0.15
+        * (
+            (
+                (OPT_TEMP - state.current_temp) * building.emissivity
+                - DEGREES_PER_POP * building.max_pop
+            )
+            / DEGREES_PER_EXCESS_MWH
+            + building.base_energy_need
+        )
+        * nr_ticks
+    )
+    return 15 * building.max_pop + 0.1 * happiness - co2
+
+
+def calculate_energy_need(state, residence, blueprint):
+    base_energy_need = (
+        blueprint.base_energy_need + 1.8
+        if "Charger" in residence.effects
+        else blueprint.base_energy_need
+    )
+    energy_wanted = (
+        OPT_TEMP
+        - residence.temperature
+        - DEGREES_PER_POP * residence.current_pop
+        + (residence.temperature - state.current_temp) * blueprint.emissivity
+    ) / DEGREES_PER_EXCESS_MWH + base_energy_need
+
+    return max(energy_wanted, base_energy_need + 1e-2)
 
 
 def best_residence_location(state):
@@ -11,16 +61,22 @@ def best_residence_location(state):
             for y2 in range(len(state.map)):
                 d = manhattan_distance(x1, y1, x2, y2)
                 if d > 0:
-                    if state.map[x2][y2] == POS_EMPTY:
+                    if d <= 3 and state.map[x2][y2] == POS_EMPTY:
                         scores[(x1, y1)] += 1 / d
-                    if state.map[x2][y2] == POS_UTILITY and d <= 3:
+                    if state.map[x2][y2] == POS_RESIDENCE:
+                        scores[(x1, y1)] += 10 / d
+                    if d <= 3 and state.map[x2][y2] == POS_MALL:
+                        scores[(x1, y1)] += 100 / d
+                    if d <= 2 and state.map[x2][y2] == POS_PARK:
+                        scores[(x1, y1)] += 100 / d
+                    if d <= 2 and state.map[x2][y2] == POS_WINDTURBINE:
                         scores[(x1, y1)] += 100 / d
     if not scores:
         return (-1, -1)
     return max(scores, key=lambda x: scores[x])  # Key with max value
 
 
-def best_utility_location(state):
+def best_utility_location(state, building_name):
     scores = defaultdict(int)
     available = available_map_slots(state)
     for x1, y1 in available:
@@ -28,13 +84,39 @@ def best_utility_location(state):
         for x2 in range(len(state.map)):
             for y2 in range(len(state.map)):
                 d = manhattan_distance(x1, y1, x2, y2)
-                if d > 0 and state.map[x2][y2] in [
-                    POS_EMPTY,
-                    POS_RESIDENCE,
-                ]:
-                    scores[(x1, y1)] += 1 / d
-                # if d <= 3 and state.map[x2][y2] == 3:
-                #     scores[(x1, y1)] = -1e5
+                if d > 0:
+                    if d <= 3 and state.map[x2][y2] == POS_EMPTY:
+                        scores[(x1, y1)] += 1 / d
+                    if (
+                        d <= 3
+                        and state.map[x2][y2] == POS_RESIDENCE
+                        and building_name == "Mall"
+                    ):
+                        scores[(x1, y1)] += 100 / d
+                    if (
+                        d <= 2
+                        and state.map[x2][y2] == POS_RESIDENCE
+                        and (building_name == "Park" or building_name == "WindTurbine")
+                    ):
+                        scores[(x1, y1)] += 100 / d
+                    if (  # Don't place in range of identical utility
+                        d <= 3 * 2
+                        and state.map[x2][y2] == POS_MALL
+                        and building_name == "Mall"
+                    ):
+                        scores[(x1, y1)] = -1e5
+                    if (  # Don't place in range of identical utility
+                        d <= 2 * 2
+                        and state.map[x2][y2] == POS_PARK
+                        and building_name == "Park"
+                    ):
+                        scores[(x1, y1)] = -1e5
+                    if (  # Don't place in range of identical utility
+                        d <= 2 * 2
+                        and state.map[x2][y2] == POS_WINDTURBINE
+                        and building_name == "WindTurbine"
+                    ):
+                        scores[(x1, y1)] = -1e5
     if not scores:
         return (-1, -1)
     return max(scores, key=lambda x: scores[x])  # Key with max value
