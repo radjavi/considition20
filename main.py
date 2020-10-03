@@ -1,11 +1,8 @@
-import operator
 import os
 import sys
-from pathlib import Path  # Python 3.6+ only
 
 from dotenv import load_dotenv
 
-import api
 from game_layer import GameLayer
 from logic import best_residence_location, best_utility_location
 
@@ -227,26 +224,15 @@ def _cheapest_upgrade(state, residence):
 def _choose_residence(state):
     # TODO: Decision tree for choosing the right residence, based on funds, map condition, etc.
     # TEST: If we have less than 4 of the most expensive buildings build eco friendly houses
-    if (
-        len(
-            [
-                residence
-                for residence in state.residences
-                if residence.building_name
-                == max(
-                    state.available_residence_buildings, key=lambda x: x.cost
-                ).building_name
-            ]
-        )
-        < 4
-    ):
-        return max(
-            state.available_residence_buildings,
-            key=lambda x: x.cost,
-        )
-    return sorted(
-        state.available_residence_buildings, key=lambda x: x.cost, reverse=True
-    )[1]
+
+    most_expensive_residence = sorted(state.available_residence_buildings, key=lambda x: x.cost, reverse=True)[0]
+
+    if len([residence for residence in state.residences if residence.building_name == most_expensive_residence.building_name]) < 4 and most_expensive_residence.release_tick <= state.turn:
+        return most_expensive_residence
+
+    for residence in sorted(state.available_residence_buildings, key=lambda x: x.cost, reverse=True):
+        if residence.release_tick <= state.turn:
+            return residence
 
 
 if __name__ == "__main__":
