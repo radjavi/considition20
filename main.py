@@ -1,19 +1,12 @@
-import operator
 import os
 import sys
-from pathlib import Path  # Python 3.6+ only
 
 from dotenv import load_dotenv
 
-import api
-from game_layer import GameLayer
-from logic import (
-    building_score,
-    calculate_energy_need,
-    best_residence_location,
-    best_utility_location,
-)
 from constants import *
+from game_layer import GameLayer
+from logic import (best_residence_location, best_utility_location,
+                   building_score, calculate_energy_need)
 
 load_dotenv()
 API_KEY = os.getenv("API_KEY")
@@ -38,20 +31,24 @@ def main():
         while GAME_LAYER.game_state.turn < GAME_LAYER.game_state.max_turns:
             take_turn()
         print("Done with game: " + GAME_LAYER.game_state.game_id)
+        print("-----------")
+        print("Total happiness: ", int(GAME_LAYER.game_state.total_happiness))
+        print("Total CO2: ", int(GAME_LAYER.game_state.total_co2))
+        print("-----------")
         print("Final score was: " + str(GAME_LAYER.get_score()["finalScore"]))
-        print("Total happiness:", GAME_LAYER.game_state.total_happiness)
-        print("Total CO2:", GAME_LAYER.game_state.total_co2)
     except KeyboardInterrupt:  # End game session in case of exceptions
         print(f"\nForce quit game: {GAME_LAYER.game_state.game_id}")
         GAME_LAYER.end_game()
     except Exception as e:  # Catching generic exceptions
         GAME_LAYER.end_game()
         raise (e)
-        # print(f"Error: {e}")
 
 
 # Modify map numbers to satisfy custom identifiers
 def preprocess_map():
+    """Preproccess the map, if there are any buildings or utilties already instantiated
+    add them to our GameState map.
+    """
     print("Preprocessing map...")
     state = GAME_LAYER.game_state
     for residence in state.residences:
@@ -68,6 +65,7 @@ def preprocess_map():
 
 
 def clean_map():
+    """Cleans the map"""
     print("Cleaning up map...")
     state = GAME_LAYER.game_state
     if len(state.residences) > 0:
@@ -78,6 +76,7 @@ def clean_map():
 
 
 def take_turn():
+    """Takes a turn"""
     state = GAME_LAYER.game_state
 
     strategy(state)
@@ -89,6 +88,11 @@ def take_turn():
 
 
 def strategy(state):
+    """Main logic/strategy for game plan.
+
+    Args:
+        state (GameState) - The current game state
+    """
     # Take one of the following actions in order of priority #
     if residence_maintenance(state):
         pass
@@ -108,8 +112,11 @@ def strategy(state):
         GAME_LAYER.wait()
 
 
-# Maintain a residence in need of maintenance
 def residence_maintenance(state):
+    """Maintain a residence in need of maintenance
+    Args:
+        state (GameState) - The current game state
+    """
     if len(state.residences) < 1:
         return False
 
@@ -127,6 +134,14 @@ def residence_maintenance(state):
 
 # Regulate the temperature of a residence if it's too low/high
 def regulate_temperature(state):
+    """Regulate the temperature of a residence if it's too low or high
+
+    Args:
+        state (GameState) - The current game state
+
+    Returns:
+        Bool
+    """
     if len(state.residences) < 1 or state.turn < 2:
         return False
     if state.funds > 150:
@@ -142,8 +157,15 @@ def regulate_temperature(state):
                 return True
 
 
-# Perform construction on a residence or utility that is not finished
 def perform_construction(state):
+    """Perform construction on a residence or utility that is not finished
+
+    Args:
+        state (GameState) - The current game state
+
+    Returns:
+        Bool
+    """
     for residence in state.residences:
         if residence.build_progress < 100:
             GAME_LAYER.build((residence.X, residence.Y))
@@ -154,8 +176,15 @@ def perform_construction(state):
             return True
 
 
-# Place a new residence at an available spot
 def place_residence(state):
+    """Places a new residence on the map at an available spot
+
+    Args:
+        state (GameState) - The current game state
+
+    Returns:
+        Bool
+    """
     residence = _choose_residence(state)
     if (
         residence
@@ -174,6 +203,14 @@ def place_residence(state):
 
 
 def place_utility(state):
+    """Places a new utility on the map at an available spot
+
+    Args:
+        state (GameState) - The current game state
+
+    Returns:
+        Bool
+    """
     # Alternate between utility and residence
     if (len(state.utilities) + len(state.residences)) % 3:
         return False
@@ -195,6 +232,14 @@ def place_utility(state):
 
 
 def _choose_utility(state):
+    """Chooses the most optimal utility to place
+
+    Args:
+        state (GameState) - The current game state
+
+    Returns:
+        BlueprintUtilityBuilding - The most optimal utility
+    """
     available_utilities = state.available_utility_buildings
     # Cost is only found on blueprint
     utility_blueprints = [
@@ -228,6 +273,14 @@ def _choose_utility(state):
 
 
 def residence_regulator(state):
+    """Checks if the building has a regulator and buys one if needed
+
+    Args:
+        state (GameState) - The current game state
+
+    Returns:
+        Bool
+    """
     for residence in state.residences:
         if residence.build_progress < 100:
             continue
@@ -240,6 +293,14 @@ def residence_regulator(state):
 
 
 def residence_upgrade(state):
+    """Chooses and buys a upgrade for a residence if needed
+
+    Args:
+        state (GameState) - The current game state
+
+    Returns:
+        Bool
+    """
     for residence in state.residences:
         if residence.build_progress < 100:
             continue
@@ -253,6 +314,14 @@ def residence_upgrade(state):
 
 
 def _choose_upgrade(state, residence):
+    """
+    Args:
+        state (GameState) - The current game state
+        residence (BlueprintResidenceBuilding) - The residence blueprint
+
+    Returns:
+        Upgrade - The upgrade
+    """
     # TODO: Decision tree for choosing the right upgrade
     return _choose_all_upgrades(state, residence)
     # return _cheapest_upgrade(state, residence)
@@ -315,11 +384,28 @@ def _feasible_buildings2(state):
 
 # Choose the building that maximizes building_score
 def _optimal_building(state, feasible_buildings):
+    """Choose the building that matches the housing queue closest
+
+    Args:
+        state (GameState) - The current game state
+        feasible_builds ([BlueprintResidenceBuilding]) - List of residence blueprints
+
+    Returns:
+        BlueprintResidenceBuilding - The most optimal building
+    """
     return max(feasible_buildings, key=lambda x: building_score(state, x), default=None)
 
 
-# Choose the building that matches the housing queue closest
 def _optimal_building2(state, feasible_buildings):
+    """Choose the building that matches the housing queue closest
+
+    Args:
+        state (GameState) - The current game state
+        feasible_builds ([BlueprintResidenceBuilding]) - List of residence blueprints
+
+    Returns:
+        BlueprintResidenceBuilding - The most optimal building
+    """
     func = lambda x: abs(state.housing_queue - x.max_pop)
     # Building with max_pop that matches housing queue closest
     building = min(feasible_buildings, key=func, default=None)

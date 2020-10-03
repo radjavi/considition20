@@ -1,9 +1,19 @@
-from collections import defaultdict
-from constants import *
 import math
+from collections import defaultdict
+
+from constants import *
 
 
 def building_score(state, building):
+    """Logic for determinating the best building in order to reach the highest score
+
+    Args:
+        state (GameState) - The current game state
+        building (BlueprintResidenceBuilding) - The building blueprint
+
+    Returns:
+        int - The final score based on the chosen building
+    """
     nr_ticks = state.max_turns - state.turn - 1 - math.ceil(100 / building.build_speed)
     happiness = (
         (
@@ -37,6 +47,16 @@ def building_score(state, building):
 
 
 def calculate_energy_need(state, residence, blueprint):
+    """Logic for determinating the energy need for a building
+
+    Args:
+        state (GameState) - The current game state
+        residence (Residence) - The residence
+        blueprint (BlueprintResidenceBuilding) - The building blueprint
+
+    Returns:
+        int - The energy needed
+    """
     base_energy_need = (
         blueprint.base_energy_need + 1.8
         if "Charger" in residence.effects
@@ -53,6 +73,14 @@ def calculate_energy_need(state, residence, blueprint):
 
 
 def best_residence_location(state):
+    """Logic for determinating the best residence location based on the current game state
+
+    Args:
+        state (GameState) - The current game state
+
+    Returns:
+        (int, int) - x and y coordinates for the best residence location
+    """
     scores = defaultdict(int)
     available = available_map_slots(state)
     for x1, y1 in available:
@@ -77,6 +105,15 @@ def best_residence_location(state):
 
 
 def best_utility_location(state, building_name):
+    """Logic for determinating the best utility location based on the current game state
+
+    Args:
+        state (GameState) - The current game state
+        building_name (str) - The building name
+
+    Returns:
+        (int, int) - x and y coordinates for the best residence location
+    """
     scores = defaultdict(int)
     available = available_map_slots(state)
     for x1, y1 in available:
@@ -123,6 +160,14 @@ def best_utility_location(state, building_name):
 
 
 def available_map_slots(state):
+    """Goes through the map and finds available slots
+
+    Args:
+        state (GameState) - The current game state
+
+    Returns:
+        [(int,int)] - A list of tuples containing ints indicating the available locations
+    """
     # Go through the map and find available slots
     return [
         (i, j)
@@ -133,4 +178,5 @@ def available_map_slots(state):
 
 
 def manhattan_distance(x1, y1, x2, y2):
+    """Calculates the manhattan distance"""
     return abs(x1 - x2) + abs(y1 - y2)
