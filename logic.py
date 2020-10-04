@@ -1,21 +1,30 @@
-import math
 from collections import defaultdict
 
 from constants import *
 
 
-def building_score(state, building):
-    """Logic for determinating the best building in order to reach the highest score
+def nr_ticks_left(state):
+    return state.max_turns - state.turn - 1
+
+
+def building_heuristic_score(state, building, nr_ticks):
+    """Logic for estimating a new building's contribution to the score at the end of the game
 
     Args:
         state (GameState) - The current game state
-        building (BlueprintResidenceBuilding) - The building blueprint
+        building (BlueprintResidenceBuilding) - The new building blueprint
+        nr_ticks (int) - Number of ticks the building will contribute to the score
 
     Returns:
-        int - The final score based on the chosen building
+        int - The chosen building's contribution to the final score
     """
-    nr_ticks = state.max_turns - state.turn - 1 - math.ceil(100 / building.build_speed)
-    happiness = (
+    happiness = building_heuristic_happiness(state, building, nr_ticks)
+    co2 = building_heuristic_co2(state, building, nr_ticks)
+    return 15 * building.max_pop + 0.1 * happiness - co2
+
+
+def building_heuristic_happiness(state, building, nr_ticks):
+    return (
         (
             building.max_happiness
             + (
@@ -29,13 +38,17 @@ def building_score(state, building):
         * building.max_pop
         * nr_ticks
     )
-    co2 = (
+
+
+def building_heuristic_co2(state, building, nr_ticks):
+    avg_map_temp = (state.max_temp + state.min_temp) / 2
+    return (
         building.co2_cost
         + building.max_pop * CO2_PER_POP * nr_ticks
         + 0.15
         * (
             (
-                (OPT_TEMP - state.current_temp) * building.emissivity
+                (OPT_TEMP - avg_map_temp) * building.emissivity
                 - DEGREES_PER_POP * building.max_pop
             )
             / DEGREES_PER_EXCESS_MWH
@@ -43,7 +56,6 @@ def building_score(state, building):
         )
         * nr_ticks
     )
-    return 15 * building.max_pop + 0.1 * happiness - co2
 
 
 def calculate_energy_need(state, residence, blueprint):

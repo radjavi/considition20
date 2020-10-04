@@ -1,12 +1,17 @@
 import os
 import sys
-
+import math
 from dotenv import load_dotenv
 
 from constants import *
 from game_layer import GameLayer
-from logic import (best_residence_location, best_utility_location,
-                   building_score, calculate_energy_need)
+from logic import (
+    best_residence_location,
+    best_utility_location,
+    building_heuristic_score,
+    calculate_energy_need,
+    nr_ticks_left,
+)
 
 load_dotenv()
 API_KEY = os.getenv("API_KEY")
@@ -78,6 +83,7 @@ def clean_map():
 def take_turn():
     """Takes a turn"""
     state = GAME_LAYER.game_state
+    print("Current score:", state.current_score)
 
     strategy(state)
 
@@ -362,29 +368,14 @@ def _choose_residence(state):
     return _optimal_building(state, _feasible_buildings(state))
 
 
-def _choose_residence2(state):
-    return _optimal_building2(state, _feasible_buildings2(state))
-
-
 def _feasible_buildings(state):
     return [
         x for x in state.available_residence_buildings if x.release_tick <= state.turn
     ]
 
 
-def _feasible_buildings2(state):
-    return [
-        x
-        for x in state.available_residence_buildings
-        if x.release_tick <= state.turn
-        and len([y for y in state.residences if x.building_name == y.building_name])
-        < RESIDENCE_LIMITS[x.building_name]
-    ]
-
-
-# Choose the building that maximizes building_score
 def _optimal_building(state, feasible_buildings):
-    """Choose the building that matches the housing queue closest
+    """Choose the building that potentially maximizes the final score
 
     Args:
         state (GameState) - The current game state
@@ -393,29 +384,31 @@ def _optimal_building(state, feasible_buildings):
     Returns:
         BlueprintResidenceBuilding - The most optimal building
     """
-    return max(feasible_buildings, key=lambda x: building_score(state, x), default=None)
-
-
-def _optimal_building2(state, feasible_buildings):
-    """Choose the building that matches the housing queue closest
-
-    Args:
-        state (GameState) - The current game state
-        feasible_builds ([BlueprintResidenceBuilding]) - List of residence blueprints
-
-    Returns:
-        BlueprintResidenceBuilding - The most optimal building
-    """
-    func = lambda x: abs(state.housing_queue - x.max_pop)
-    # Building with max_pop that matches housing queue closest
-    building = min(feasible_buildings, key=func, default=None)
-    if building:
-        buildings = [x for x in feasible_buildings if func(x) == func(building)]
-        # If multiple buldings, choose based on second condition
-        if len(buildings) > 1:
-            return max(buildings, key=lambda x: x.max_pop)
-        else:
-            return building
+    current_buildings_heuristic = sum(
+        [
+            building_heuristic_score(
+                state, GAME_LAYER.get_blueprint(y.building_name), nr_ticks_left(state)
+            )
+            for y in state.residences
+        ]
+    )
+    estimated_final_score = (
+        lambda x: state.current_score
+        + current_buildings_heuristic
+        + building_heuristic_score(
+            state, x, nr_ticks_left(state) - math.ceil(100 / x.build_speed)
+        )
+    )
+    return max(
+        [
+            x
+            for x in feasible_buildings
+            if estimated_final_score(x)
+            > state.current_score + current_buildings_heuristic
+        ],
+        key=estimated_final_score,
+        default=None,
+    )
 
 
 if __name__ == "__main__":

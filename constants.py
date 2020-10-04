@@ -15,15 +15,6 @@ FUNDS_HIGH = 36000
 
 HEALTH_MIN = 50
 
-RESIDENCE_LIMITS = {
-    "Apartments": 1,
-    "ModernApartments": 1,
-    "Cabin": 1,
-    "EnvironmentalHouse": 1,
-    "HighRise": 7,
-    "LuxuryResidence": 2,
-}
-
 # Map position identifiers
 POS_EMPTY = 0
 POS_TREE = 1
