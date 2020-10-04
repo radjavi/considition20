@@ -114,6 +114,7 @@ def strategy(state):
 
 def residence_maintenance(state):
     """Maintain a residence in need of maintenance
+
     Args:
         state (GameState) - The current game state
     """
@@ -132,7 +133,6 @@ def residence_maintenance(state):
         return True
 
 
-# Regulate the temperature of a residence if it's too low/high
 def regulate_temperature(state):
     """Regulate the temperature of a residence if it's too low or high
 
@@ -170,6 +170,7 @@ def perform_construction(state):
         if residence.build_progress < 100:
             GAME_LAYER.build((residence.X, residence.Y))
             return True
+
     for utility in state.utilities:
         if utility.build_progress < 100:
             GAME_LAYER.build((utility.X, utility.Y))
@@ -401,7 +402,7 @@ def _optimal_building2(state, feasible_buildings):
 
     Args:
         state (GameState) - The current game state
-        feasible_builds ([BlueprintResidenceBuilding]) - List of residence blueprints
+        feasible_buildings ([BlueprintResidenceBuilding]) - List of residence blueprints
 
     Returns:
         BlueprintResidenceBuilding - The most optimal building
