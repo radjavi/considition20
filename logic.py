@@ -7,52 +7,52 @@ def nr_ticks_left(state):
     return state.max_turns - state.turn - 1
 
 
-def building_heuristic_score(state, building, nr_ticks):
-    """Logic for estimating a new building's contribution to the score at the end of the game
+def residence_heuristic_score(state, residence, nr_ticks):
+    """Logic for estimating a new residence's contribution to the score at the end of the game
 
     Args:
         state (GameState) - The current game state
-        building (BlueprintResidenceBuilding) - The new building blueprint
+        residence (BlueprintResidenceBuilding) - The new building blueprint
         nr_ticks (int) - Number of ticks the building will contribute to the score
 
     Returns:
         int - The chosen building's contribution to the final score
     """
-    happiness = building_heuristic_happiness(state, building, nr_ticks)
-    co2 = building_heuristic_co2(state, building, nr_ticks)
-    return 15 * building.max_pop + 0.1 * happiness - co2
+    happiness = residence_heuristic_happiness(state, residence, nr_ticks)
+    co2 = residence_heuristic_co2(state, residence, nr_ticks)
+    return 15 * residence.max_pop + 0.1 * happiness - co2
 
 
-def building_heuristic_happiness(state, building, nr_ticks):
+def residence_heuristic_happiness(state, residence, nr_ticks):
     return (
         (
-            building.max_happiness
+            residence.max_happiness
             + (
-                building.max_happiness * 0.1
+                residence.max_happiness * 0.1
                 if not any(
-                    building.building_name == y.building_name for y in state.residences
+                    residence.building_name == y.building_name for y in state.residences
                 )
                 else 0
             )
         )
-        * building.max_pop
+        * residence.max_pop
         * nr_ticks
     )
 
 
-def building_heuristic_co2(state, building, nr_ticks):
+def residence_heuristic_co2(state, residence, nr_ticks):
     avg_map_temp = (state.max_temp + state.min_temp) / 2
     return (
-        building.co2_cost
-        + building.max_pop * CO2_PER_POP * nr_ticks
+        residence.co2_cost
+        + residence.max_pop * CO2_PER_POP * nr_ticks
         + 0.15
         * (
             (
-                (OPT_TEMP - avg_map_temp) * building.emissivity
-                - DEGREES_PER_POP * building.max_pop
+                (OPT_TEMP - avg_map_temp) * residence.emissivity
+                - DEGREES_PER_POP * residence.max_pop
             )
             / DEGREES_PER_EXCESS_MWH
-            + building.base_energy_need
+            + residence.base_energy_need
         )
         * nr_ticks
     )

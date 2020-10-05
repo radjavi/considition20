@@ -8,7 +8,7 @@ from game_layer import GameLayer
 from logic import (
     best_residence_location,
     best_utility_location,
-    building_heuristic_score,
+    residence_heuristic_score,
     calculate_energy_need,
     nr_ticks_left,
 )
@@ -366,28 +366,28 @@ def _cheapest_upgrade(state, residence):
 
 
 def _choose_residence(state):
-    return _optimal_building(state, _feasible_buildings(state))
+    return _optimal_residence(state, _feasible_residences(state))
 
 
-def _feasible_buildings(state):
+def _feasible_residences(state):
     return [
         x for x in state.available_residence_buildings if x.release_tick <= state.turn
     ]
 
 
-def _optimal_building(state, feasible_buildings):
+def _optimal_residence(state, feasible_residences):
     """Choose the building that potentially maximizes the final score
 
     Args:
         state (GameState) - The current game state
-        feasible_buildings ([BlueprintResidenceBuilding]) - List of residence blueprints
+        feasible_residences ([BlueprintResidenceBuilding]) - List of residence blueprints
 
     Returns:
         BlueprintResidenceBuilding - The most optimal building
     """
-    current_buildings_heuristic = sum(
+    current_residences_heuristic = sum(
         [
-            building_heuristic_score(
+            residence_heuristic_score(
                 state, GAME_LAYER.get_blueprint(y.building_name), nr_ticks_left(state)
             )
             for y in state.residences
@@ -395,18 +395,13 @@ def _optimal_building(state, feasible_buildings):
     )
     estimated_final_score = (
         lambda x: state.current_score
-        + current_buildings_heuristic
-        + building_heuristic_score(
+        + current_residences_heuristic
+        + residence_heuristic_score(
             state, x, nr_ticks_left(state) - math.ceil(100 / x.build_speed)
         )
     )
     return max(
-        [
-            x
-            for x in feasible_buildings
-            if estimated_final_score(x)
-            > state.current_score + current_buildings_heuristic
-        ],
+        [x for x in feasible_residences if estimated_final_score(x) > state.max_score],
         key=estimated_final_score,
         default=None,
     )
