@@ -150,17 +150,28 @@ def regulate_temperature(state):
     """
     if len(state.residences) < 1 or state.turn < 2:
         return False
-    if state.funds > 150:
-        residence = max(state.residences, key=lambda x: abs(x.temperature - 21))
-        if residence.build_progress >= 100:
-            blueprint = blueprint = GAME_LAYER.get_residence_blueprint(
-                residence.building_name
-            )
-            energy = calculate_energy_need(state, residence, blueprint)
 
-            if abs(residence.temperature - 21) >= 1.5:
-                GAME_LAYER.adjust_energy_level((residence.X, residence.Y), energy)
-                return True
+    if state.funds > FUNDS_MIN:
+        residences = sorted(
+            state.residences,
+            key=lambda x: abs(
+                calculate_energy_need(
+                    state, x, GAME_LAYER.get_residence_blueprint(x.building_name)
+                )
+                - x.requested_energy_in
+            ),
+            reverse=True,
+        )
+        for residence in residences:
+            if residence.build_progress >= 100:
+                blueprint = blueprint = GAME_LAYER.get_residence_blueprint(
+                    residence.building_name
+                )
+                energy = calculate_energy_need(state, residence, blueprint)
+
+                if abs(energy - residence.requested_energy_in) >= 2.5:
+                    GAME_LAYER.adjust_energy_level((residence.X, residence.Y), energy)
+                    return True
 
 
 def perform_construction(state):
