@@ -67,7 +67,7 @@ def utility_heuristic_score(state, utility, nr_ticks, x, y):
         int - The chosen utility's contribution to the final score
     """
     happiness = 0
-    co2 = utility.co2_cost + utility.base_energy_need * nr_ticks
+    co2 = utility.co2_cost + CO2_PER_KWH * utility.base_energy_need * nr_ticks
 
     radius = 3 if utility.building_name == "Mall" else 2
     for x2 in range(len(state.map)):
@@ -76,18 +76,19 @@ def utility_heuristic_score(state, utility, nr_ticks, x, y):
             residence_blueprint = residence_blueprint_at_pos(state, x2, y2)
             utility_blueprint = utility_blueprint_at_pos(state, x2, y2)
             max_pop = residence_blueprint.max_pop if residence_blueprint else 40
-            if (
-                d > 0
-                and d <= radius
-                and state.map[x2][y2] in [POS_EMPTY, POS_RESIDENCE]
-            ):
+            base_energy_need = (
+                (residence_blueprint and residence_blueprint.base_energy_need)
+                or (utility_blueprint and utility_blueprint.base_energy_need)
+                or 3.4
+            )
+            if d > 0 and d <= radius and state.map[x2][y2] == POS_RESIDENCE:
                 if utility.building_name == "Mall":
                     happiness += 0.12 * max_pop * nr_ticks
                 if utility.building_name == "Park":
                     happiness += 0.11 * max_pop * nr_ticks
-                    co2 -= 0.007 * max_pop
+                    co2 -= 0.007 * max_pop * nr_ticks
                 if utility.building_name == "WindTurbine":
-                    co2 -= CO2_PER_KWH * 3.4 * nr_ticks
+                    co2 -= CO2_PER_KWH * min(3.4, base_energy_need) * nr_ticks
             if (
                 utility_blueprint
                 and d > 0
@@ -103,11 +104,7 @@ def utility_heuristic_score(state, utility, nr_ticks, x, y):
                     )
                 )
             ):
-                co2 -= CO2_PER_KWH * min(
-                    3.4,
-                    utility_blueprint.base_energy_need or 3.4,
-                    utility.base_energy_need or 3.4,
-                )
+                co2 -= CO2_PER_KWH * min(3.4, base_energy_need) * nr_ticks
 
     return 0.1 * happiness - co2
 
