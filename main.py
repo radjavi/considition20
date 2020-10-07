@@ -9,6 +9,7 @@ from logic import (
     best_residence_location,
     best_utility_location,
     residence_heuristic_score,
+    utility_heuristic_score,
     calculate_energy_need,
     nr_ticks_left,
 )
@@ -21,8 +22,6 @@ API_KEY = os.getenv("API_KEY")
 map_name = sys.argv[1] if len(sys.argv) > 1 else "training1"
 
 GAME_LAYER: GameLayer = GameLayer(API_KEY)
-
-LAST_RESIDENCE_BUILD_TURN = 0
 
 
 def main():
@@ -37,6 +36,10 @@ def main():
             take_turn()
         print("Done with game: " + GAME_LAYER.game_state.game_id)
         print("-----------")
+        print(
+            "Total population:",
+            sum(x.current_pop for x in GAME_LAYER.game_state.residences),
+        )
         print("Total happiness: ", int(GAME_LAYER.game_state.total_happiness))
         print("Total CO2: ", int(GAME_LAYER.game_state.total_co2))
         print("-----------")
@@ -108,10 +111,12 @@ def strategy(state):
         pass
     elif perform_construction(state):
         pass
-    elif place_residence(state):
+    elif place_building(state):
         pass
-    elif place_utility(state):
-        pass
+    # elif place_residence(state):
+    #     pass
+    # elif place_utility(state):
+    #     pass
     elif residence_upgrade(state):
         pass
     else:
@@ -140,6 +145,33 @@ def residence_maintenance(state):
 
 
 def regulate_temperature(state):
+    if len(state.residences) < 1 or state.turn < 2:
+        return False
+
+    if state.funds > FUNDS_MIN:
+        residences = sorted(
+            state.residences,
+            key=lambda x: abs(
+                calculate_energy_need(
+                    state, x, GAME_LAYER.get_residence_blueprint(x.building_name)
+                )
+                - x.requested_energy_in
+            ),
+            reverse=True,
+        )
+        for residence in residences:
+            if residence.build_progress >= 100:
+                blueprint = blueprint = GAME_LAYER.get_residence_blueprint(
+                    residence.building_name
+                )
+                energy = calculate_energy_need(state, residence, blueprint)
+
+                if abs(energy - residence.requested_energy_in) >= 2.5:
+                    GAME_LAYER.adjust_energy_level((residence.X, residence.Y), energy)
+                    return True
+
+
+def regulate_temperature2(state):
     """Regulate the temperature of a residence if it's too low or high
 
     Args:
@@ -150,7 +182,7 @@ def regulate_temperature(state):
     """
     if len(state.residences) < 1 or state.turn < 2:
         return False
-    if state.funds > 150:
+    if state.funds > FUNDS_MIN:
         residence = max(state.residences, key=lambda x: abs(x.temperature - 21))
         if residence.build_progress >= 100:
             blueprint = blueprint = GAME_LAYER.get_residence_blueprint(
@@ -183,8 +215,8 @@ def perform_construction(state):
             return True
 
 
-def place_residence(state):
-    """Places a new residence on the map at an available spot
+def place_building(state):
+    """Places a new building (residence or utility) on the map at an available spot
 
     Args:
         state (GameState) - The current game state
@@ -192,7 +224,32 @@ def place_residence(state):
     Returns:
         Bool
     """
-    residence = _choose_residence(state)
+    residence, residence_score = _choose_residence(state)
+    utility, utility_score = _choose_utility(state)
+    # print(state.max_estimated_score, residence_score, utility_score)
+    # print(
+    #     current_estimated_final_score(
+    #         state, len(set(x.building_name for x in state.residences))
+    #     )
+    # )
+
+    if residence and residence_score >= utility_score:
+        place_residence(state, residence, residence_score)
+    elif utility:
+        place_utility(state, utility, utility_score)
+
+
+def place_residence(state, residence, residence_score):
+    """Places a new residence on the map at an available spot
+
+    Args:
+        state (GameState) - The current game state
+        residence (BlueprintResidenceBuilding) - The residence to place
+        residence_score (number) - The estimated final score including the residence
+
+    Returns:
+        Bool
+    """
     if (
         residence
         and state.funds - residence.cost >= FUNDS_MIN
@@ -203,26 +260,65 @@ def place_residence(state):
             return False
 
         state.map[x][y] = POS_RESIDENCE
-        global LAST_RESIDENCE_BUILD_TURN
-        LAST_RESIDENCE_BUILD_TURN = state.turn
+        state.max_estimated_score = residence_score
         GAME_LAYER.place_foundation((x, y), residence.building_name)
         return True
 
 
-def place_utility(state):
+def _choose_residence(state):
+    return _optimal_residence(state, _feasible_residences(state))
+
+
+def _feasible_residences(state):
+    return [
+        x for x in state.available_residence_buildings if x.release_tick <= state.turn
+    ]
+
+
+def _optimal_residence(state, feasible_residences):
+    """Choose the building that potentially maximizes the final score
+
+    Args:
+        state (GameState) - The current game state
+        feasible_residences ([BlueprintResidenceBuilding]) - List of residence blueprints
+
+    Returns:
+        BlueprintResidenceBuilding - The most optimal building
+    """
+    residence, score = None, 0
+    for r in feasible_residences:
+        current_distinct_residences = set(x.building_name for x in state.residences)
+        nr_distinct_residences = len(current_distinct_residences) + (
+            1 if r.building_name not in current_distinct_residences else 0
+        )
+        estimated_final_score = current_estimated_final_score(
+            state, nr_distinct_residences
+        ) + residence_heuristic_score(  # Contribution from new residence
+            state,
+            r,
+            nr_ticks_left(state) - math.ceil(100 / r.build_speed) - 20,
+            nr_distinct_residences,
+        )
+        if estimated_final_score > score:
+            residence, score = r, estimated_final_score
+
+    if residence and score > 100:
+        return residence, score
+    else:
+        return None, 0
+
+
+def place_utility(state, utility, utility_score):
     """Places a new utility on the map at an available spot
 
     Args:
         state (GameState) - The current game state
+        utility (BlueprintUtilityBuilding) - The utility to place
+        utility_score (number) - The estimated final score including the utility
 
     Returns:
         Bool
     """
-    # Alternate between utility and residence
-    if (len(state.utilities) + len(state.residences)) % 3:
-        return False
-
-    utility = _choose_utility(state)
     if utility and state.funds - utility.cost > FUNDS_MIN:
         x, y = best_utility_location(state, utility.building_name)
         if x < 0 or y < 0:
@@ -234,6 +330,7 @@ def place_utility(state):
             state.map[x][y] = POS_MALL
         elif utility.building_name == "WindTurbine":
             state.map[x][y] = POS_WINDTURBINE
+        state.max_estimated_score = utility_score
         GAME_LAYER.place_foundation((x, y), utility.building_name)
         return True
 
@@ -247,36 +344,47 @@ def _choose_utility(state):
     Returns:
         BlueprintUtilityBuilding - The most optimal utility
     """
-    available_utilities = state.available_utility_buildings
-    # Cost is only found on blueprint
-    utility_blueprints = [
-        GAME_LAYER.get_utility_blueprint(utility.building_name)
-        for utility in available_utilities
+    return _optimal_utility(state, _feasible_utilities(state))
+
+
+def _feasible_utilities(state):
+    return [
+        x for x in state.available_utility_buildings if x.release_tick <= state.turn
     ]
 
-    # # If mall is already placed, choose WindTurbine or Park
-    # if next((x for x in state.utilities if x.building_name == "Mall"), None):
-    #     utility = next(
-    #         (x for x in utility_blueprints if x.building_name == "WindTurbine"), None
-    #     )
-    # else:
-    #     utility = next(
-    #         (x for x in utility_blueprints if x.building_name == "Mall"), None
-    #     )
-    if len(state.residences) >= 5:
-        utility = next(
-            (x for x in utility_blueprints if x.building_name == "WindTurbine"), None
+
+def _optimal_utility(state, feasible_utilities):
+    """Choose the utility that potentially maximizes the final score
+
+    Args:
+        state (GameState) - The current game state
+        feasible_utilities ([BlueprintResidenceBuilding]) - List of utility blueprints
+
+    Returns:
+        BlueprintUtilityBuilding - The most optimal utility
+    """
+    utility, score = None, 0
+    for u in feasible_utilities:
+        X, Y = best_utility_location(state, u.building_name)
+        if X < 0 or Y < 0:
+            continue
+        nr_distinct_residences = len(set(x.building_name for x in state.residences))
+        estimated_final_score = current_estimated_final_score(
+            state, nr_distinct_residences
+        ) + utility_heuristic_score(  # Contribution from new utility
+            state,
+            u,
+            nr_ticks_left(state) - math.ceil(100 / u.build_speed) - 20,
+            X,
+            Y,
         )
-    # If mall is already placed, choose Park
-    elif state.funds > FUNDS_MED:
-        utility = next(
-            (x for x in utility_blueprints if x.building_name == "Mall"), None
-        )
+        if estimated_final_score > score:
+            utility, score = u, estimated_final_score
+
+    if utility and score > 100:
+        return utility, score
     else:
-        utility = next(
-            (x for x in utility_blueprints if x.building_name == "Park"), None
-        )
-    return utility
+        return None, 0
 
 
 def residence_regulator(state):
@@ -365,45 +473,34 @@ def _cheapest_upgrade(state, residence):
         return upgrade
 
 
-def _choose_residence(state):
-    return _optimal_residence(state, _feasible_residences(state))
-
-
-def _feasible_residences(state):
-    return [
-        x for x in state.available_residence_buildings if x.release_tick <= state.turn
-    ]
-
-
-def _optimal_residence(state, feasible_residences):
-    """Choose the building that potentially maximizes the final score
-
-    Args:
-        state (GameState) - The current game state
-        feasible_residences ([BlueprintResidenceBuilding]) - List of residence blueprints
-
-    Returns:
-        BlueprintResidenceBuilding - The most optimal building
-    """
+def current_estimated_final_score(state, nr_distinct_residences):
+    # Contribution from current residences
     current_residences_heuristic = sum(
         [
             residence_heuristic_score(
-                state, GAME_LAYER.get_blueprint(y.building_name), nr_ticks_left(state)
+                state,
+                GAME_LAYER.get_blueprint(x.building_name),
+                nr_ticks_left(state),
+                nr_distinct_residences,
             )
-            for y in state.residences
+            for x in state.residences
         ]
     )
-    estimated_final_score = (
-        lambda x: state.current_score
-        + current_residences_heuristic
-        + residence_heuristic_score(
-            state, x, nr_ticks_left(state) - math.ceil(100 / x.build_speed)
-        )
+    # Contribution from current utilities
+    current_utilities_heuristic = sum(
+        [
+            utility_heuristic_score(
+                state,
+                GAME_LAYER.get_blueprint(y.building_name),
+                nr_ticks_left(state),
+                y.X,
+                y.Y,
+            )
+            for y in state.utilities
+        ]
     )
-    return max(
-        [x for x in feasible_residences if estimated_final_score(x) > state.max_score],
-        key=estimated_final_score,
-        default=None,
+    return (
+        state.current_score + current_residences_heuristic + current_utilities_heuristic
     )
 
 

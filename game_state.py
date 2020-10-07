@@ -40,7 +40,7 @@ class GameState:
         self.messages: List[str] = []
         self.total_pop = 0
         self.current_score = 0
-        self.max_score = 0
+        self.max_estimated_score = 0
 
     def update_state(self, state):
         self.turn = state["turn"]
@@ -61,11 +61,6 @@ class GameState:
         self.total_pop = sum(x.current_pop for x in self.residences)
         self.current_score = max(
             15 * self.total_pop + 0.1 * self.total_happiness - self.total_co2, 0
-        )
-        self.max_score = (
-            self.current_score
-            if self.current_score > self.max_score
-            else self.max_score
         )
 
 
