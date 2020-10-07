@@ -145,6 +145,14 @@ def residence_maintenance(state):
 
 
 def regulate_temperature(state):
+    """Regulate the temperature of a residence
+
+    Args:
+        state (GameState) - The current game state
+
+    Returns:
+        Bool
+    """
     if len(state.residences) < 1 or state.turn < 2:
         return False
 
@@ -169,30 +177,6 @@ def regulate_temperature(state):
                 if abs(energy - residence.requested_energy_in) >= ENERGY_DIFF_LIMIT:
                     GAME_LAYER.adjust_energy_level((residence.X, residence.Y), energy)
                     return True
-
-
-def regulate_temperature2(state):
-    """Regulate the temperature of a residence if it's too low or high
-
-    Args:
-        state (GameState) - The current game state
-
-    Returns:
-        Bool
-    """
-    if len(state.residences) < 1 or state.turn < 2:
-        return False
-    if state.funds > FUNDS_MIN:
-        residence = max(state.residences, key=lambda x: abs(x.temperature - 21))
-        if residence.build_progress >= 100:
-            blueprint = blueprint = GAME_LAYER.get_residence_blueprint(
-                residence.building_name
-            )
-            energy = calculate_energy_need(state, residence, blueprint)
-
-            if abs(residence.temperature - 21) >= 1.5:
-                GAME_LAYER.adjust_energy_level((residence.X, residence.Y), energy)
-                return True
 
 
 def perform_construction(state):
