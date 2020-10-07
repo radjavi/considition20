@@ -15,10 +15,12 @@ from logic import (
 
 load_dotenv()
 API_KEY = os.getenv("API_KEY")
+
 # The different map names can be found on considition.com/rules
 # Map name taken as command line argument.
 # If left empty, the map "training1" will be selected.
 map_name = sys.argv[1] if len(sys.argv) > 1 else "training1"
+VERBOSE = sys.argv[2] if len(sys.argv) > 2 else False
 
 GAME_LAYER: GameLayer = GameLayer(API_KEY)
 
@@ -36,10 +38,11 @@ def main():
         while GAME_LAYER.game_state.turn < GAME_LAYER.game_state.max_turns:
             take_turn()
         print("Done with game: " + GAME_LAYER.game_state.game_id)
-        print("-----------")
-        print("Total happiness: ", int(GAME_LAYER.game_state.total_happiness))
-        print("Total CO2: ", int(GAME_LAYER.game_state.total_co2))
-        print("-----------")
+        if VERBOSE:
+            print("-----------")
+            print("Total happiness: ", int(GAME_LAYER.game_state.total_happiness))
+            print("Total CO2: ", int(GAME_LAYER.game_state.total_co2))
+            print("-----------")
         print("Final score was: " + str(GAME_LAYER.get_score()["finalScore"]))
     except KeyboardInterrupt:  # End game session in case of exceptions
         print(f"\nForce quit game: {GAME_LAYER.game_state.game_id}")
@@ -51,8 +54,8 @@ def main():
 
 # Modify map numbers to satisfy custom identifiers
 def preprocess_map():
-    """Preproccess the map, if there are any buildings or utilties already instantiated
-    add them to our GameState map.
+    """Preproccess the map, if there are any buildings or utilties already
+    instantiated add them to our GameState map.
     """
     print("Preprocessing map...")
     state = GAME_LAYER.game_state
@@ -83,14 +86,13 @@ def clean_map():
 def take_turn():
     """Takes a turn"""
     state = GAME_LAYER.game_state
-    print("Current score:", state.current_score)
-
     strategy(state)
 
+    _score = str(int(state.current_score))
     for message in GAME_LAYER.game_state.messages:
-        print(message)
+        print(f"[{_score}]: ", message)
     for error in GAME_LAYER.game_state.errors:
-        print("Error: " + error)
+        print(f"[{_score}]: ", error)
 
 
 def strategy(state):
@@ -154,16 +156,18 @@ def regulate_temperature(state):
     if state.funds > FUNDS_MIN:
         residences = sorted(
             state.residences,
-            key=lambda x: abs(
+            key=lambda residence: abs(
                 calculate_energy_need(
-                    state, x, GAME_LAYER.get_residence_blueprint(x.building_name)
+                    state,
+                    residence,
+                    GAME_LAYER.get_residence_blueprint(residence.building_name)
                 )
-                - x.requested_energy_in
+                - residence.requested_energy_in
             ),
             reverse=True,
         )
         for residence in residences:
-            if residence.build_progress >= 100:
+            if residence.build_progress == 100:
                 blueprint = blueprint = GAME_LAYER.get_residence_blueprint(
                     residence.building_name
                 )
@@ -265,15 +269,6 @@ def _choose_utility(state):
         for utility in available_utilities
     ]
 
-    # # If mall is already placed, choose WindTurbine or Park
-    # if next((x for x in state.utilities if x.building_name == "Mall"), None):
-    #     utility = next(
-    #         (x for x in utility_blueprints if x.building_name == "WindTurbine"), None
-    #     )
-    # else:
-    #     utility = next(
-    #         (x for x in utility_blueprints if x.building_name == "Mall"), None
-    #     )
     if len(state.residences) >= 5:
         utility = next(
             (x for x in utility_blueprints if x.building_name == "WindTurbine"), None
