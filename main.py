@@ -286,7 +286,7 @@ def _optimal_residence(state, feasible_residences):
         if estimated_final_score > score:
             residence, score = r, estimated_final_score
 
-    if residence and score > 100:
+    if residence and score > state.max_score:
         return residence, score
     else:
         return None, 0
@@ -365,7 +365,7 @@ def _optimal_utility(state, feasible_utilities):
         if estimated_final_score > score:
             utility, score = u, estimated_final_score
 
-    if utility and score > 100:
+    if utility and score > state.max_score:
         return utility, score
     else:
         return None, 0

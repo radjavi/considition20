@@ -41,6 +41,7 @@ class GameState:
         self.total_pop = 0
         self.current_score = 0
         self.max_estimated_score = 0
+        self.max_score = 0
 
     def update_state(self, state):
         self.turn = state["turn"]
@@ -62,6 +63,8 @@ class GameState:
         self.current_score = max(
             15 * self.total_pop + 0.1 * self.total_happiness - self.total_co2, 0
         )
+        if self.current_score > self.max_score:
+            self.max_score = self.current_score
 
 
 class EnergyLevel:
