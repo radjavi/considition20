@@ -108,9 +108,9 @@ def strategy(state):
         pass
     elif perform_construction(state):
         pass
-    elif place_residence(state):
-        pass
     elif place_utility(state):
+        pass
+    elif place_residence(state):
         pass
     elif residence_upgrade(state):
         pass
