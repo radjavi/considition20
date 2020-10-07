@@ -24,8 +24,6 @@ VERBOSE = sys.argv[2] if len(sys.argv) > 2 else False
 
 GAME_LAYER: GameLayer = GameLayer(API_KEY)
 
-LAST_RESIDENCE_BUILD_TURN = 0
-
 
 def main():
     try:
@@ -160,7 +158,7 @@ def regulate_temperature(state):
                 calculate_energy_need(
                     state,
                     residence,
-                    GAME_LAYER.get_residence_blueprint(residence.building_name)
+                    GAME_LAYER.get_residence_blueprint(residence.building_name),
                 )
                 - residence.requested_energy_in
             ),
@@ -218,8 +216,6 @@ def place_residence(state):
             return False
 
         state.map[x][y] = POS_RESIDENCE
-        global LAST_RESIDENCE_BUILD_TURN
-        LAST_RESIDENCE_BUILD_TURN = state.turn
         GAME_LAYER.place_foundation((x, y), residence.building_name)
         return True
 
