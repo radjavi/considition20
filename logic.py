@@ -60,12 +60,10 @@ def residence_heuristic_co2(state, residence, nr_ticks):
 
 def calculate_energy_need(state, residence, blueprint):
     """Logic for determinating the energy need for a building
-
     Args:
         state (GameState) - The current game state
         residence (Residence) - The residence
         blueprint (BlueprintResidenceBuilding) - The building blueprint
-
     Returns:
         int - The energy needed
     """
@@ -74,11 +72,16 @@ def calculate_energy_need(state, residence, blueprint):
         if "Charger" in residence.effects
         else blueprint.base_energy_need
     )
+    emissivity = (
+        blueprint.emissivity * 0.6
+        if "Insulation" in residence.effects
+        else blueprint.emissivity
+    )
     energy_wanted = (
         OPT_TEMP
         - residence.temperature
         - DEGREES_PER_POP * residence.current_pop
-        + (residence.temperature - state.current_temp) * blueprint.emissivity
+        + (residence.temperature - state.current_temp) * emissivity
     ) / DEGREES_PER_EXCESS_MWH + base_energy_need
 
     return max(energy_wanted, base_energy_need + 1e-2)
