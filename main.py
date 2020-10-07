@@ -169,7 +169,7 @@ def regulate_temperature(state):
                 )
                 energy = calculate_energy_need(state, residence, blueprint)
 
-                if abs(energy - residence.requested_energy_in) >= 2.5:
+                if abs(energy - residence.requested_energy_in) >= ENERGY_DIFF_LIMIT:
                     GAME_LAYER.adjust_energy_level((residence.X, residence.Y), energy)
                     return True
 
