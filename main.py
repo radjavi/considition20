@@ -269,7 +269,6 @@ def _choose_utility(state):
         utility = next(
             (x for x in utility_blueprints if x.building_name == "WindTurbine"), None
         )
-    # If mall is already placed, choose Park
     elif state.funds > FUNDS_MED:
         utility = next(
             (x for x in utility_blueprints if x.building_name == "Mall"), None
@@ -313,8 +312,7 @@ def residence_upgrade(state):
     for residence in state.residences:
         if residence.build_progress < 100:
             continue
-        upgrade = _choose_upgrade(state, residence)
-        if upgrade:
+        if upgrade := _choose_upgrade(state, residence):
             GAME_LAYER.buy_upgrade(
                 (residence.X, residence.Y),
                 upgrade.name,
