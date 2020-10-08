@@ -7,7 +7,7 @@ def nr_ticks_left(state):
     return state.max_turns - state.turn - 1
 
 
-def residence_heuristic_score(state, residence, nr_ticks, nr_distinct_residences):
+def residence_heuristic_score(state, residence, nr_ticks, nr_distinct_residences, x, y):
     """Logic for estimating a residence's contribution to the score at the end of the game
 
     Args:
@@ -19,22 +19,37 @@ def residence_heuristic_score(state, residence, nr_ticks, nr_distinct_residences
     Returns:
         int - The chosen building's contribution to the final score
     """
+    if nr_ticks <= 0:
+        return 0
     happiness = residence_heuristic_happiness(
-        state, residence, nr_ticks, nr_distinct_residences
+        state, residence, nr_ticks, nr_distinct_residences, x, y
     )
-    co2 = residence_heuristic_co2(state, residence, nr_ticks)
+    co2 = residence_heuristic_co2(state, residence, nr_ticks, x, y)
+    # print(residence.building_name, 15 * residence.max_pop + 0.1 * happiness - co2)
     return 15 * residence.max_pop + 0.1 * happiness - co2
 
 
-def residence_heuristic_happiness(state, residence, nr_ticks, nr_distinct_residences):
-    return (
+def residence_heuristic_happiness(
+    state, residence, nr_ticks, nr_distinct_residences, x, y
+):
+    happiness = (
         (residence.max_happiness * (1 + 0.1 * nr_distinct_residences))
         * residence.max_pop
         * nr_ticks
     )
 
+    for x2 in range(len(state.map)):
+        for y2 in range(len(state.map)):
+            d = manhattan_distance(x, y, x2, y2)
+            if d <= 3 and state.map[x2][y2] == POS_MALL:
+                happiness += 0.12 * residence.max_pop * nr_ticks
+            if d <= 2 and state.map[x2][y2] == POS_PARK:
+                happiness += 0.11 * residence.max_pop * nr_ticks
 
-def residence_heuristic_co2(state, residence, nr_ticks):
+    return happiness
+
+
+def residence_heuristic_co2(state, residence, nr_ticks, x, y):
     avg_map_temp = (state.max_temp + state.min_temp) / 2
     base_energy = residence.base_energy_need
     energy = max(
@@ -46,11 +61,21 @@ def residence_heuristic_co2(state, residence, nr_ticks):
         + base_energy,
         base_energy,
     )
-    return (
+    co2 = (
         residence.co2_cost
         + residence.max_pop * CO2_PER_POP * nr_ticks
         + CO2_PER_KWH * energy * nr_ticks
     )
+
+    for x2 in range(len(state.map)):
+        for y2 in range(len(state.map)):
+            d = manhattan_distance(x, y, x2, y2)
+            if d <= 2 and state.map[x2][y2] == POS_PARK:
+                co2 -= 0.007 * residence.max_pop * nr_ticks
+            if d <= 2 and state.map[x2][y2] == POS_WINDTURBINE:
+                co2 -= CO2_PER_KWH * 3.4 * nr_ticks
+
+    return co2
 
 
 def utility_heuristic_score(state, utility, nr_ticks, x, y):
@@ -66,14 +91,19 @@ def utility_heuristic_score(state, utility, nr_ticks, x, y):
     Returns:
         int - The chosen utility's contribution to the final score
     """
+    if nr_ticks <= 0:
+        return 0
     for existing_utility in state.utilities:
         radius = 3 if existing_utility.building_name == "Mall" else 2
         for x2 in range(len(state.map)):
             for y2 in range(len(state.map)):
                 d = manhattan_distance(existing_utility.X, existing_utility.Y, x2, y2)
-                if d <= radius and state.map[x][y] == POS_EMPTY and state.map[x2][y2] == POS_EMPTY:
+                if (
+                    d <= radius
+                    and state.map[x][y] == POS_EMPTY
+                    and state.map[x2][y2] == POS_EMPTY
+                ):
                     return -1e5
-        
 
     happiness = 0
     co2 = utility.co2_cost + CO2_PER_KWH * utility.base_energy_need * nr_ticks
@@ -90,14 +120,21 @@ def utility_heuristic_score(state, utility, nr_ticks, x, y):
                 or (utility_blueprint and utility_blueprint.base_energy_need)
                 or 3.4
             )
-            if d > 0 and d <= radius and state.map[x2][y2] in [POS_EMPTY, POS_RESIDENCE]:
+            if (
+                d > 0
+                and d <= radius
+                and state.map[x2][y2] in [POS_EMPTY, POS_RESIDENCE]
+            ):
                 if utility.building_name == "Mall":
                     happiness += 0.12 * max_pop * nr_ticks
+                    # co2 -= CO2_PER_KWH * min(3.4, base_energy_need) * nr_ticks
                 if utility.building_name == "Park":
                     happiness += 0.11 * max_pop * nr_ticks
                     co2 -= 0.007 * max_pop * nr_ticks
+                    # co2 -= CO2_PER_KWH * min(3.4, base_energy_need) * nr_ticks
                 if utility.building_name == "WindTurbine":
-                    co2 -= CO2_PER_KWH * min(3.4, base_energy_need) * nr_ticks
+                    co2 -= CO2_PER_KWH * 3.4 * nr_ticks
+
             if (
                 utility_blueprint
                 and d > 0
@@ -113,9 +150,9 @@ def utility_heuristic_score(state, utility, nr_ticks, x, y):
                     )
                 )
             ):
-                co2 -= CO2_PER_KWH * min(3.4, base_energy_need) * nr_ticks
+                co2 -= CO2_PER_KWH * 3.4 * nr_ticks
 
-    print(utility.building_name, 0.1*happiness - co2)
+    # print(utility.building_name, 0.1 * happiness - co2)
     return 0.1 * happiness - co2
 
 
@@ -150,7 +187,7 @@ def calculate_energy_need(state, residence, blueprint):
     return max(energy_wanted, base_energy_need + 1e-2)
 
 
-def best_residence_location(state):
+def best_residence_location(state, residence):
     """Logic for determinating the best residence location based on the current game state
 
     Args:
@@ -168,18 +205,19 @@ def best_residence_location(state):
                 d = manhattan_distance(x1, y1, x2, y2)
                 if d > 0:
                     if d <= 3 and state.map[x2][y2] == POS_EMPTY:
-                        scores[(x1, y1)] += 1 / d
+                        scores[(x1, y1)] += 0.001
                     if state.map[x2][y2] == POS_RESIDENCE:
-                        scores[(x1, y1)] += 10 / d
+                        scores[(x1, y1)] += 0.01
                     if d <= 3 and state.map[x2][y2] == POS_MALL:
-                        scores[(x1, y1)] += 100 / d
+                        scores[(x1, y1)] += 0.1 * 0.12 * residence.max_pop
                     if d <= 2 and state.map[x2][y2] == POS_PARK:
-                        scores[(x1, y1)] += 100 / d
+                        scores[(x1, y1)] += 0.007 * residence.max_pop
                     if d <= 2 and state.map[x2][y2] == POS_WINDTURBINE:
-                        scores[(x1, y1)] += 100 / d
-    if not scores:
-        return (-1, -1)
-    return max(scores, key=lambda x: scores[x])  # Key with max value
+                        scores[(x1, y1)] += CO2_PER_KWH * 3.4
+
+    best_location = max(scores, key=lambda x: scores[x])  # Key with max value
+    if scores[best_location] > 0:
+        return best_location
 
 
 def best_utility_location(state, building_name):
@@ -208,31 +246,40 @@ def best_utility_location(state, building_name):
                         and building_name == "Mall"
                     ):
                         residence_blueprint = residence_blueprint_at_pos(state, x2, y2)
-                        scores[(x1, y1)] += 0.1 * 0.12 * residence_blueprint.max_pop
+                        max_pop = (
+                            residence_blueprint.max_pop if residence_blueprint else 40
+                        )
+                        scores[(x1, y1)] += 0.1 * 0.12 * max_pop
                     if (
                         d <= 2
                         and state.map[x2][y2] == POS_RESIDENCE
                         and building_name == "Park"
                     ):
                         residence_blueprint = residence_blueprint_at_pos(state, x2, y2)
-                        scores[(x1, y1)] += 0.007 * residence_blueprint.max_pop
+                        max_pop = (
+                            residence_blueprint.max_pop if residence_blueprint else 40
+                        )
+                        scores[(x1, y1)] += 0.007 * max_pop
                     if (
                         d <= 2
                         and state.map[x2][y2] == POS_RESIDENCE
                         and building_name == "WindTurbine"
                     ):
                         residence_blueprint = residence_blueprint_at_pos(state, x2, y2)
-                        scores[(x1, y1)] += CO2_PER_KWH * min(
-                            3.4, residence_blueprint.base_energy_need
+                        base_energy_need = (
+                            residence_blueprint.base_energy_need
+                            if residence_blueprint
+                            else 3.4
                         )
+                        scores[(x1, y1)] += CO2_PER_KWH * 3.4
                     if (
                         d <= 2
                         and state.map[x2][y2] in [POS_MALL, POS_PARK]
                         and building_name == "WindTurbine"
                     ):
                         utility_blueprint = utility_blueprint_at_pos(state, x2, y2)
-                        scores[(x1, y1)] += CO2_PER_KWH * min(
-                            3.4, utility_blueprint.base_energy_need
+                        scores[(x1, y1)] += (
+                            CO2_PER_KWH * utility_blueprint.base_energy_need
                         )
                     if (  # Don't place in range of identical utility
                         d <= 3 * 2
@@ -252,9 +299,10 @@ def best_utility_location(state, building_name):
                         and building_name == "WindTurbine"
                     ):
                         scores[(x1, y1)] = -1e5
-    if not scores:
-        return (-1, -1)
-    return max(scores, key=lambda x: scores[x])  # Key with max value
+
+    best_location = max(scores, key=lambda x: scores[x])  # Key with max value
+    if scores[best_location] > 0:
+        return best_location
 
 
 def residence_blueprint_at_pos(state, x, y):
@@ -264,7 +312,8 @@ def residence_blueprint_at_pos(state, x, y):
                 (
                     blueprint
                     for blueprint in state.available_residence_buildings
-                    if blueprint.building_name == residence.building_name
+                    if blueprint.building_name.lower()
+                    == residence.building_name.lower()
                 ),
                 None,
             )
@@ -277,7 +326,7 @@ def utility_blueprint_at_pos(state, x, y):
                 (
                     blueprint
                     for blueprint in state.available_utility_buildings
-                    if blueprint.building_name == utility.building_name
+                    if blueprint.building_name.lower() == utility.building_name.lower()
                 ),
                 None,
             )

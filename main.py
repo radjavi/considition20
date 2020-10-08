@@ -236,10 +236,11 @@ def place_residence(state, residence, residence_score):
     """
     if (
         residence
+        and residence.release_tick <= state.turn
         and state.funds - residence.cost >= FUNDS_MIN
         and state.queue_happiness < 20
     ):
-        x, y = best_residence_location(state)
+        x, y = best_residence_location(state, residence)
         if x < 0 or y < 0:
             return False
 
@@ -271,17 +272,25 @@ def _optimal_residence(state, feasible_residences):
     """
     residence, score = None, 0
     for r in feasible_residences:
+        X, Y = best_residence_location(state, r)
+        if X < 0 or Y < 0:
+            continue
         current_distinct_residences = set(x.building_name for x in state.residences)
         nr_distinct_residences = len(current_distinct_residences) + (
             1 if r.building_name not in current_distinct_residences else 0
         )
+        ticks_to_build = math.ceil(100 / r.build_speed)
+        if state.turn + ticks_to_build >= state.max_turns - 50:
+            continue
         estimated_final_score = current_estimated_final_score(
             state, nr_distinct_residences
         ) + residence_heuristic_score(  # Contribution from new residence
             state,
             r,
-            nr_ticks_left(state) - math.ceil(100 / r.build_speed) - 20,
+            nr_ticks_left(state) - ticks_to_build,
             nr_distinct_residences,
+            X,
+            Y,
         )
         if estimated_final_score > score:
             residence, score = r, estimated_final_score
@@ -303,7 +312,11 @@ def place_utility(state, utility, utility_score):
     Returns:
         Bool
     """
-    if utility and state.funds - utility.cost > FUNDS_MIN:
+    if (
+        utility
+        and utility.release_tick <= state.turn
+        and state.funds - utility.cost > FUNDS_MIN
+    ):
         x, y = best_utility_location(state, utility.building_name)
         if x < 0 or y < 0:
             return False
@@ -353,12 +366,15 @@ def _optimal_utility(state, feasible_utilities):
         if X < 0 or Y < 0:
             continue
         nr_distinct_residences = len(set(x.building_name for x in state.residences))
+        ticks_to_build = math.ceil(100 / u.build_speed)
+        if state.turn + ticks_to_build >= state.max_turns - 50:
+            continue
         estimated_final_score = current_estimated_final_score(
             state, nr_distinct_residences
         ) + utility_heuristic_score(  # Contribution from new utility
             state,
             u,
-            nr_ticks_left(state) - math.ceil(100 / u.build_speed) - 20,
+            nr_ticks_left(state) - ticks_to_build,
             X,
             Y,
         )
@@ -466,6 +482,8 @@ def current_estimated_final_score(state, nr_distinct_residences):
                 GAME_LAYER.get_blueprint(x.building_name),
                 nr_ticks_left(state),
                 nr_distinct_residences,
+                x.X,
+                x.Y,
             )
             for x in state.residences
         ]
