@@ -1,17 +1,16 @@
+import math
 import os
 import sys
-import math
+import time
+from datetime import datetime
+
 from dotenv import load_dotenv
 
 from constants import *
 from game_layer import GameLayer
-from logic import (
-    best_residence_location,
-    best_utility_location,
-    residence_heuristic_score,
-    calculate_energy_need,
-    nr_ticks_left,
-)
+from logic import (best_residence_location, best_utility_location,
+                   calculate_energy_need, nr_ticks_left,
+                   residence_heuristic_score)
 
 load_dotenv()
 API_KEY = os.getenv("API_KEY")
@@ -41,7 +40,13 @@ def main():
             print("Total happiness: ", int(GAME_LAYER.game_state.total_happiness))
             print("Total CO2: ", int(GAME_LAYER.game_state.total_co2))
             print("-----------")
-        print("Final score was: " + str(GAME_LAYER.get_score()["finalScore"]))
+        print("Final score was: " + str(GAME_LAYER.get_score()["finalScore"]) + " 🚀")
+
+        with open(map_name + ".txt", "a+") as f:
+            f.write(
+                f'{datetime.fromtimestamp(int(time.time()))}: {map_name}, {str(GAME_LAYER.get_score()["finalScore"])}, {GAME_LAYER.game_state.game_id}\n'
+            )
+
     except KeyboardInterrupt:  # End game session in case of exceptions
         print(f"\nForce quit game: {GAME_LAYER.game_state.game_id}")
         GAME_LAYER.end_game()
@@ -108,9 +113,9 @@ def strategy(state):
         pass
     elif perform_construction(state):
         pass
-    elif place_residence(state):
-        pass
     elif place_utility(state):
+        pass
+    elif place_residence(state):
         pass
     elif residence_upgrade(state):
         pass
@@ -269,7 +274,6 @@ def _choose_utility(state):
         utility = next(
             (x for x in utility_blueprints if x.building_name == "WindTurbine"), None
         )
-    # If mall is already placed, choose Park
     elif state.funds > FUNDS_MED:
         utility = next(
             (x for x in utility_blueprints if x.building_name == "Mall"), None
@@ -313,8 +317,7 @@ def residence_upgrade(state):
     for residence in state.residences:
         if residence.build_progress < 100:
             continue
-        upgrade = _choose_upgrade(state, residence)
-        if upgrade:
+        if upgrade := _choose_upgrade(state, residence):
             GAME_LAYER.buy_upgrade(
                 (residence.X, residence.Y),
                 upgrade.name,
@@ -410,4 +413,5 @@ def _optimal_residence(state, feasible_residences):
 
 
 if __name__ == "__main__":
-    main()
+    while True:
+        main()
