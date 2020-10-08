@@ -210,7 +210,7 @@ def place_building(state):
     """
     residence, residence_score = _choose_residence(state)
     utility, utility_score = _choose_utility(state)
-    # print(state.max_estimated_score, residence_score, utility_score)
+    # print(state.max_score, residence_score, utility_score)
     # print(
     #     current_estimated_final_score(
     #         state, len(set(x.building_name for x in state.residences))

@@ -66,6 +66,15 @@ def utility_heuristic_score(state, utility, nr_ticks, x, y):
     Returns:
         int - The chosen utility's contribution to the final score
     """
+    for existing_utility in state.utilities:
+        radius = 3 if existing_utility.building_name == "Mall" else 2
+        for x2 in range(len(state.map)):
+            for y2 in range(len(state.map)):
+                d = manhattan_distance(existing_utility.X, existing_utility.Y, x2, y2)
+                if d <= radius and state.map[x][y] == POS_EMPTY and state.map[x2][y2] == POS_EMPTY:
+                    return -1e5
+        
+
     happiness = 0
     co2 = utility.co2_cost + CO2_PER_KWH * utility.base_energy_need * nr_ticks
 
@@ -81,7 +90,7 @@ def utility_heuristic_score(state, utility, nr_ticks, x, y):
                 or (utility_blueprint and utility_blueprint.base_energy_need)
                 or 3.4
             )
-            if d > 0 and d <= radius and state.map[x2][y2] == POS_RESIDENCE:
+            if d > 0 and d <= radius and state.map[x2][y2] in [POS_EMPTY, POS_RESIDENCE]:
                 if utility.building_name == "Mall":
                     happiness += 0.12 * max_pop * nr_ticks
                 if utility.building_name == "Park":
@@ -106,6 +115,7 @@ def utility_heuristic_score(state, utility, nr_ticks, x, y):
             ):
                 co2 -= CO2_PER_KWH * min(3.4, base_energy_need) * nr_ticks
 
+    print(utility.building_name, 0.1*happiness - co2)
     return 0.1 * happiness - co2
 
 
