@@ -209,6 +209,7 @@ def best_residence_location(state, residence):
                     if d <= 3 and state.map[x2][y2] == POS_MALL:
                         scores[(x1, y1)] += 0.1 * 0.12 * residence.max_pop
                     if d <= 2 and state.map[x2][y2] == POS_PARK:
+                        scores[(x1, y1)] += 0.1 * 0.11 * residence.max_pop
                         scores[(x1, y1)] += 0.007 * residence.max_pop
                     if d <= 2 and state.map[x2][y2] == POS_WINDTURBINE:
                         scores[(x1, y1)] += CO2_PER_KWH * 3.4
@@ -244,31 +245,21 @@ def best_utility_location(state, building_name):
                         and building_name == "Mall"
                     ):
                         residence_blueprint = residence_blueprint_at_pos(state, x2, y2)
-                        max_pop = (
-                            residence_blueprint.max_pop if residence_blueprint else 40
-                        )
-                        scores[(x1, y1)] += 0.1 * 0.12 * max_pop
+                        scores[(x1, y1)] += 0.1 * 0.12 * residence_blueprint.max_pop
                     if (
                         d <= 2
                         and state.map[x2][y2] == POS_RESIDENCE
                         and building_name == "Park"
                     ):
                         residence_blueprint = residence_blueprint_at_pos(state, x2, y2)
-                        max_pop = (
-                            residence_blueprint.max_pop if residence_blueprint else 40
-                        )
-                        scores[(x1, y1)] += 0.007 * max_pop
+                        scores[(x1, y1)] += 0.1 * 0.12 * residence_blueprint.max_pop
+                        scores[(x1, y1)] += 0.007 * residence_blueprint.max_pop
                     if (
                         d <= 2
                         and state.map[x2][y2] == POS_RESIDENCE
                         and building_name == "WindTurbine"
                     ):
                         residence_blueprint = residence_blueprint_at_pos(state, x2, y2)
-                        base_energy_need = (
-                            residence_blueprint.base_energy_need
-                            if residence_blueprint
-                            else 3.4
-                        )
                         scores[(x1, y1)] += CO2_PER_KWH * 3.4
                     if (
                         d <= 2

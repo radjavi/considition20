@@ -513,5 +513,4 @@ def current_estimated_final_score(state, nr_distinct_residences):
 
 
 if __name__ == "__main__":
-    while True:
-        main()
+    main()
