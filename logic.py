@@ -158,12 +158,10 @@ def utility_heuristic_score(state, utility, nr_ticks, x, y):
 
 def calculate_energy_need(state, residence, blueprint):
     """Logic for determinating the energy need for a building
-
     Args:
         state (GameState) - The current game state
         residence (Residence) - The residence
         blueprint (BlueprintResidenceBuilding) - The building blueprint
-
     Returns:
         int - The energy needed
     """
