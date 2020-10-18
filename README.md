@@ -16,7 +16,7 @@ The boilerplate was cloned from [here](https://github.com/Considition/2020-Pytho
 This was our team's attempt at solving the sustainable cities problem. Our final solution ended up placing in a 7th place out of roughly 50 teams. The hack was written using Python. 🐍
 
 ### Strategy and Solution ⚡️
-The overall strategy was straight forward. A solution which prioritizes already existing buildings by maintaining and upgrading them, while always trying to keep the carbon footprint as low as possible. If there was nothing else to do we started to prioritize building new utilities and residence buildings at the most optimal locations. (See logic.py)[/logic.py]
+The overall strategy was straight forward. A solution which prioritizes already existing buildings by maintaining and upgrading them, while always trying to keep the carbon footprint as low as possible. If there was nothing else to do we started to prioritize building new utilities and residence buildings at the most optimal locations. [See logic.py](/logic.py)
 <div align="center">
     <img src="assets/game.png" width="85%">
 </div>
